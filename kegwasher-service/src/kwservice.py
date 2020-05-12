@@ -250,6 +250,7 @@ class HardwareObject(object):
         self._pin = None
         self.name = kwargs.get('name', None)
         self.pin = kwargs.get('pin', None)
+        self.setup()
 
     @property
     def name(self):
@@ -277,28 +278,23 @@ class HardwareObject(object):
         self._pin = pin
         return self.pin
 
-    @classmethod
-    def close(cls):
-        cls.off()
+    def close(self):
+        self.off()
 
-    @classmethod
-    def off(cls):
-        log.debug(f'Setting pin {cls.pin} to OFF/Low Voltage')
-        GPIO.output(cls.pin, 0)
+    def off(self):
+        log.debug(f'Setting pin {self.pin} to OFF/Low Voltage')
+        GPIO.output(self.pin, 0)
 
-    @classmethod
-    def on(cls):
-        log.debug(f'Setting pin {cls.pin} to ON/High Voltage')
-        GPIO.output(cls.pin, 1)
+    def on(self):
+        log.debug(f'Setting pin {self.pin} to ON/High Voltage')
+        GPIO.output(self.pin, 1)
 
-    @classmethod
-    def open(cls):
-        cls.on()
+    def open(self):
+        self.on()
 
-    @classmethod
-    def setup(cls):
-        log.debug(f'Setting pin {cls.pin} to GPIO.OUT mode')
-        GPIO.setup(cls.pin, GPIO.OUT)
+    def setup(self):
+        log.debug(f'Setting pin {self.pin} to GPIO.OUT mode')
+        GPIO.setup(self.pin, GPIO.OUT)
 
 
 class Display(object):
@@ -353,11 +349,13 @@ class KegWasher(object):
             'air_fill_open': self.air_fill_open,
             'clean_closed': self.clean_closed,
             'clean_open': self.clean_open,
+            'cleaner_fill': self.cleaner_fill,
             'co2_fill_closed': self.co2_fill_closed,
             'co2_fill_open': self.co2_fill_open,
             'drain': self.drain,
             'rinse': self.rinse,
-            'sanitize': self.sanitize
+            'sanitize': self.sanitize,
+            'sanitizer_fill': self.sanitizer_fill
         }
         self._modes = None
         self._aborted = False
@@ -451,18 +449,18 @@ class KegWasher(object):
 
     def _all_heaters_off(self):
         log.debug(f'Turning all heaters off')
-        for heater in self._heaters.values():
-            heater.off()
+        for heater in self._heaters.keys():
+            self._heaters.get(heater).off()
 
     def _all_pumps_off(self):
         log.debug(f'Turning all pumps off')
-        for pump in self._pumps.values():
-            pump.off()
+        for pump in self._pumps.keys():
+            self._pumps.get(pump).off()
 
     def _all_valves_closed(self):
         log.debug(f'Closing all valves')
-        for valve in self._valves.values():
-            valve.close()
+        for valve in self._valves.keys():
+            self._valves.get(valve).close()
 
     def _all_off_closed(self):
         log.debug(f'Turning off all devices, closing all valves')
@@ -552,6 +550,17 @@ class KegWasher(object):
         self._display.clear()
         self._display.message(f'Select Mode\n{self._modes.data["display_name"]}')
 
+    def execute_mode(self):
+        log.debug(f'Executing Mode: {self._modes.data["display_name"]}')
+        operations = self._modes.data.get('operations')
+        for cmd, t in operations:
+            log.debug(f'Cmd: {cmd}, time: {t}')
+            self._mode_map[cmd]()
+            for i in range(0, t):
+                self._display.clear()
+                self._display.message(f'{cmd}\nTime Left: {t - i}')
+                time.sleep(1)
+
     def sw_abort(self, *args, **kwargs):
         log.debug(f'ABORT Latch Released: received args {args} ;; received kwargs {kwargs}')
         self._all_off_closed()
@@ -561,9 +570,17 @@ class KegWasher(object):
     def sw_enter(self, *args, **kwargs):
         fall_rise = GPIO.input(args[0])
         log.debug(f'ENTER Button press: received args {args} ;; received kwargs {kwargs} ;; fall_rise {fall_rise}')
+        if self._aborted:
+            log.debug(f'Resetting abort state')
+            self._aborted = False
+            self.update_status('select_mode')
+            return
         if self._button_lock:
             log.debug(f'Button lockout enabled, ignoring')
             return
+        t = threading.Thread(target=self.execute_mode())
+        t.daemon = True
+        t.start()
 
     def sw_mode(self, *args, **kwargs):
         fall_rise = GPIO.input(args[0])
@@ -607,7 +624,7 @@ class KegWasher(object):
         log.debug('Entering Infinite Loop Handler')
         try:
             while True:
-                time.sleep(200)
+                time.sleep(1e6)
 
         except KeyboardInterrupt:
             self._display.clear()
