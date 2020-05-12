@@ -6,20 +6,21 @@ import Adafruit_CharLCD as LCD
 import logging
 import os
 import RPi.GPIO as GPIO
+import threading
 import time
 
 
 # Mode Configuration
 # Available Mode Operations
 # air_fill_closed   - Fill keg with air, all other valves closed
-# air_fill_open     - Fill keg with air, waste_out valve open
-# clean_closed      - Closed loop clean: cleaner_in, cleaner_rtn & pump valves open, pump on
-# clean_open        - Open loop clean: cleaner_in, waste_out & pump valves open, pump on
+# air_fill_open     - Fill keg with air, waste_out valve on
+# clean_closed      - Closed loop clean: cleaner_in, cleaner_rtn & pump valves on, pump on
+# clean_open        - Open loop clean: cleaner_in, waste_out & pump valves on, pump on
 # co2_fill_closed   - Fill keg with CO2, all other valves closed
-# co2_fill_open     - Fill keg with CO2, waste_out valve open
-# drain             - waste_out valve open, all other valves closed
-# rinse             - water_in, waste_out & pump valves open, pump on
-# sanitize          - sanitizer_in, waste_out & pump valves open, pump on
+# co2_fill_open     - Fill keg with CO2, waste_out valve on
+# drain             - waste_out valve on, all other valves closed
+# rinse             - water_in, waste_out & pump valves on, pump on
+# sanitize          - sanitizer_in, waste_out & pump valves on, pump on
 mode_config = {
     'clean': {
         'display_name': 'Clean',
@@ -97,6 +98,20 @@ mode_config = {
             ('air_fill_open',    10),
             ('drain',            60),
         ]
+    },
+    'sanitizer_fill': {
+        'display_name': 'Fill Sanitizer',
+        'operations': [
+            #  Operation         Time to Run Operation
+            ('santizer_fill',    10)
+        ]
+    },
+    'cleaner_fill': {
+        'display_name': 'Fill Cleaner',
+        'operations': [
+            #  Operation         Time to Run Operation
+            ('cleaner_fill',     10)
+        ]
     }
 }
 
@@ -113,27 +128,30 @@ pin_config = {
         'lcd_columns':  16,
         'lcd_rows':     2
     },
-    'pumps': {
-        'pump_1':       {'pin': 27}
-    },
-    'switches': {
-        'sw_mode':      {'pin': 5,     'PUD': GPIO.PUD_DOWN,    'event': GPIO.BOTH,       'callback': 'sw_mode'},
-        'sw_enter':     {'pin': 6,     'PUD': GPIO.PUD_DOWN,    'event': GPIO.BOTH,       'callback': 'sw_enter'},
-        'sw_3':         {'pin': 12,    'PUD': GPIO.PUD_DOWN,    'event': GPIO.BOTH,       'callback': 'sw_nc'},
-        'sw_4':         {'pin': 13,    'PUD': GPIO.PUD_DOWN,    'event': GPIO.BOTH,       'callback': 'sw_nc'},
-        'sw_abort':     {'pin': 20,    'PUD': GPIO.PUD_DOWN,    'event': GPIO.RISING,     'callback': 'sw_abort'}
-    },
-    'valves': {
-        'cleaner_in':   {'pin': 21},
-        'sanitizer_in': {'pin': 26},
-        'water_in':     {'pin': 4},
-        'pump_in':      {'pin': 17},
-        'co2_in':       {'pin': 18},
-        'air_in':       {'pin': 22},
-        'cleaner_rtn':  {'pin': 23},
-        'pump_out':     {'pin': 24},
-        'waste_out':    {'pin': 25}
-    }
+    'heaters': [
+        {'name': 'heater_1',     'pin': 11}
+    ],
+    'pumps': [
+        {'name': 'pump_1',       'pin': 27}
+    ],
+    'switches': [
+        {'name': 'mode',         'pin': 5,    'PUD': GPIO.PUD_DOWN,   'event': GPIO.BOTH,      'callback': 'sw_mode'},
+        {'name': 'enter',        'pin': 6,    'PUD': GPIO.PUD_DOWN,   'event': GPIO.BOTH,      'callback': 'sw_enter'},
+        {'name': 'sw_3',         'pin': 12,   'PUD': GPIO.PUD_DOWN,   'event': GPIO.BOTH,      'callback': 'sw_nc'},
+        {'name': 'sw_4',         'pin': 13,   'PUD': GPIO.PUD_DOWN,   'event': GPIO.BOTH,      'callback': 'sw_nc'},
+        {'name': 'abort',        'pin': 20,   'PUD': GPIO.PUD_DOWN,   'event': GPIO.RISING,    'callback': 'sw_abort'}
+    ],
+    'valves': [
+        {'name': 'cleaner_in',   'pin': 21},
+        {'name': 'sanitizer_in', 'pin': 26},
+        {'name': 'water_in',     'pin': 4},
+        {'name': 'pump_in',      'pin': 17},
+        {'name': 'co2_in',       'pin': 18},
+        {'name': 'air_in',       'pin': 22},
+        {'name': 'cleaner_rtn',  'pin': 23},
+        {'name': 'pump_out',     'pin': 24},
+        {'name': 'waste_out',    'pin': 25}
+    ]
 }
 
 
@@ -160,6 +178,16 @@ log.setLevel(logging_levels.get(os.getenv('LOG_LEVEL', 'INFO'), logging.INFO))
 
 GPIO.setmode(GPIO.BCM)
 
+
+class KegwasherException(Exception):
+    """
+    Base Exception Class
+    """
+
+
+class ConfigException(KegwasherException):
+    def __init__(self, message):
+        super(ConfigException, self).__init__(message)
 
 class CleaningMode(object):
     def __init__(self, data):
@@ -215,6 +243,97 @@ class ModeList(object):
         self.head = self.head.previous
 
 
+class HardwareObject(object):
+    def __init__(self, *args, **kwargs):
+        log.debug(f'Making hardware object\t\targs: {args}\t\tkwargs: {kwargs}')
+        self._name = None
+        self._pin = None
+        self.name = kwargs.get('name', None)
+        self.pin = kwargs.get('pin', None)
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, name=None):
+        if not name:
+            error_msg = f'Required attribute "name" not specified'
+            log.fatal(error_msg)
+            raise ConfigException(error_msg)
+        self._name = name
+        return self.name
+
+    @property
+    def pin(self):
+        return self._pin
+
+    @pin.setter
+    def pin(self, pin):
+        if not pin:
+            error_msg = f'Required attribute "pin" not specified'
+            log.fatal(error_msg)
+            raise ConfigException(error_msg)
+        self._pin = pin
+        return self.pin
+
+    @classmethod
+    def close(cls):
+        cls.off()
+
+    @classmethod
+    def off(cls):
+        log.debug(f'Setting pin {cls.pin} to OFF/Low Voltage')
+        GPIO.output(cls.pin, 0)
+
+    @classmethod
+    def on(cls):
+        log.debug(f'Setting pin {cls.pin} to ON/High Voltage')
+        GPIO.output(cls.pin, 1)
+
+    @classmethod
+    def open(cls):
+        cls.on()
+
+    @classmethod
+    def setup(cls):
+        log.debug(f'Setting pin {cls.pin} to GPIO.OUT mode')
+        GPIO.setup(cls.pin, GPIO.OUT)
+
+
+class Display(object):
+    def init_display(self, display=dict()):
+        log.debug(f'Initializing Display Driver')
+        lcd = LCD.Adafruit_CharLCD(
+            display.get('lcd_rs').get('pin'),
+            display.get('lcd_en').get('pin'),
+            display.get('lcd_d4').get('pin'),
+            display.get('lcd_d5').get('pin'),
+            display.get('lcd_d6').get('pin'),
+            display.get('lcd_d7').get('pin'),
+            display.get('lcd_columns'),
+            display.get('lcd_rows'),
+            display.get('lcd_bl').get('pin'))
+        return lcd
+
+class Heater(HardwareObject):
+    def __init__(self, *args, **kwargs):
+        log.debug(f'Registering heater {kwargs.get("name", None)}')
+        super(Heater, self).__init__(*args, **kwargs)
+
+
+class Pump(HardwareObject):
+    def __init__(self, *args, **kwargs):
+        log.debug(f'Registering pump {kwargs.get("name", None)}')
+        super(Pump, self).__init__(*args, **kwargs)
+
+
+class Valve(HardwareObject):
+    def __init__(self, *args, **kwargs):
+        log.debug(f'Registering valve {kwargs.get("name", None)}')
+        super(Valve, self).__init__(*args, **kwargs)
+
+
 class KegWasher(object):
     def __init__(self, pin_config=None, mode_config=None):
         log.debug(f'Initializing KegWasher')
@@ -224,64 +343,105 @@ class KegWasher(object):
             'sw_mode': self.sw_mode,
             'sw_nc': self.sw_nc
         }
+        self._status_map = {
+            'initialize': self.__init__,
+            'select_mode': self.select_mode,
+            'aborted': self.aborted_mode,
+        }
+        self._mode_map = {
+            'air_fill_closed': self.air_fill_closed,
+            'air_fill_open': self.air_fill_open,
+            'clean_closed': self.clean_closed,
+            'clean_open': self.clean_open,
+            'co2_fill_closed': self.co2_fill_closed,
+            'co2_fill_open': self.co2_fill_open,
+            'drain': self.drain,
+            'rinse': self.rinse,
+            'sanitize': self.sanitize
+        }
         self._modes = None
-        self._button_lock = 0
+        self._aborted = False
+        self._button_lock = False
         self._mode_button_press_time = 0
         self._enter_button_press_time = 0
-        self._validate_hardware(pin_config)
+        self._status = 'initialize'
+        #
+        self._validate_hardware_config(pin_config)
         self._pin_config = pin_config
-        self._init_display()
-        self._lcd.clear()
-        self._lcd.message(f'Initializing....\nPlease.Standby..')
-        self._init_pumps()
-        self._init_valves()
-        self._init_switches()
+        self._display = Display().init_display(pin_config.get('display'))
+        self._display.clear()
+        self._display.message(f'Initializing....\nPlease.Standby..')
+        self._heaters = self._init_heaters(pin_config.get('heaters'))
+        self._pumps = self._init_pumps(pin_config.get('pumps'))
+        self._valves = self._init_valves(pin_config.get('valves'))
+        self._switches = self._init_switches(pin_config.get('switches'))
         self._init_modes(mode_config)
 
-    def _init_display(self):
-        self._lcd = LCD.Adafruit_CharLCD(
-            self._pin_config.get('display', dict()).get('lcd_rs').get('pin'),
-            self._pin_config.get('display', dict()).get('lcd_en').get('pin'),
-            self._pin_config.get('display', dict()).get('lcd_d4').get('pin'),
-            self._pin_config.get('display', dict()).get('lcd_d5').get('pin'),
-            self._pin_config.get('display', dict()).get('lcd_d6').get('pin'),
-            self._pin_config.get('display', dict()).get('lcd_d7').get('pin'),
-            self._pin_config.get('display', dict()).get('lcd_columns'),
-            self._pin_config.get('display', dict()).get('lcd_rows'),
-            self._pin_config.get('display', dict()).get('lcd_bl').get('pin'))
+    def _init_heaters(self, heaters=list()):
+        log.debug(f'Initializing heaters')
+        configured_heaters = dict()
+        for heater in heaters:
+            if not heater.get('name', None) and not heater.get('pin', None):
+                error_msg = f'Missing correct heater configuration {heater}'
+                log.fatal(error_msg)
+                raise ConfigException(error_msg)
+            configured_heaters[heater.get('name')] = Heater(**heater)
+        return configured_heaters
 
     def _init_modes(self, modes=None):
+        log.debug(f'Creating circular doubly linked list from defined modes')
         self._modes = ModeList()
         for mode, data in modes.items():
             self._modes.append(CleaningMode(data))
 
-    def _init_pumps(self):
-        for pump_name, pump_settings in self._pin_config['pumps'].items():
-            log.debug(f'Setting pump {pump_name} on pin {pump_settings.get("pin", "Undefined")} to {GPIO.OUT} mode')
-            GPIO.setup(pump_settings.get("pin", 0), GPIO.OUT)
-            log.debug(f'Setting pump {pump_name} on pin {pump_settings.get("pin", "Undefined")} to OFF')
-            GPIO.output(pump_settings.get('pin', 0), 0)
+    def _init_pumps(self, pumps=list()):
+        log.debug(f'Initializing pumps')
+        configured_pumps = dict()
+        for pump in pumps:
+            if not pump.get('name', None) and not pump.get('pin', None):
+                error_msg = f'Missing correct pump configuration {pump}'
+                log.fatal(error_msg)
+                raise ConfigException(error_msg)
+            configured_pumps[pump.get('name')] = Pump(**pump)
+        return configured_pumps
 
-    def _init_switches(self):
-        for switch_name, switch_settings in self._pin_config['switches'].items():
-            log.debug(f'Intializing Switch: {switch_name}')
-            GPIO.setup(switch_settings.get('pin', 0), GPIO.IN, pull_up_down=switch_settings.get('PUD', GPIO.PUD_UP))
-            log.debug(f'Configuring event detection for {switch_name}, callback: {switch_settings["callback"]}')
-            GPIO.add_event_detect(switch_settings.get('pin', 0),
-                                  switch_settings.get('event', GPIO.BOTH),
-                                  self._switch_callbacks.get(switch_settings.get('callback', 'sw_nc'), self.sw_nc))
+    def _init_switches(self, switches=list()):
+        log.debug(f'Initializing switches')
+        configured_switches = dict()
+        for switch in switches:
+            if not switch.get('name', None) \
+                    and not switch.get('pin', None) \
+                    and not switch.get('PUD', None) \
+                    and not switch.get('event', None) \
+                    and not switch.get('callback', None):
+                error_msg = f'Invalid switch configuration: {switch}'
+                log.fatal(error_msg)
+                raise ConfigException(error_msg)
+            log.debug(f'Initializing Switch: {switch.get("name")}')
+            GPIO.setup(switch.get('pin', 0), GPIO.IN, pull_up_down=switch.get('PUD', GPIO.PUD_DOWN))
+            log.debug(f'Configuring event detection for {switch.get("name")}, callback: {switch.get("callback")}')
+            GPIO.add_event_detect(switch.get('pin', 0),
+                                  switch.get('event', GPIO.BOTH),
+                                  self._switch_callbacks.get(switch.get('callback', 'sw_nc'), self.sw_nc))
+            configured_switches[switch.get('name')] = switch
+        return configured_switches
 
-    def _init_valves(self):
-        for valve_name, valve_settings in self._pin_config['valves'].items():
-            log.debug(f'Setting valve {valve_name} on pin {valve_settings.get("pin", "Undefined")} to {GPIO.OUT} mode')
-            GPIO.setup(valve_settings.get("pin", 0), GPIO.OUT)
-            log.debug(f'Setting valve {valve_name} on pin {valve_settings.get("pin", "Undefined")} to CLOSED')
-            GPIO.output(valve_settings.get("pin", 0), 0)
+    def _init_valves(self, valves=list()):
+        log.debug(f'Initializing valves')
+        configured_valves = dict()
+        for valve in valves:
+            if not valve.get('name', None) and not valve.get('pin', None):
+                error_msg = f'Missing valve configuration: {valve}'
+                log.fatal(error_msg)
+                raise Exception(error_msg)
+            configured_valves[valve.get('name')] = Valve(**valve)
+        return configured_valves
 
-    def _validate_hardware(self, pin_config=None):
-        log.debug(f'Hardware raw object: {pin_config}')
+    def _validate_hardware_config(self, pin_config=None):
+        log.debug(f'Validating hardware configuration')
         if not (pin_config and
                 pin_config.get('display', None) and
+                pin_config.get('heaters', None) and
                 pin_config.get('pumps') and
                 pin_config.get('switches') and
                 pin_config.get('valves')):
@@ -289,15 +449,128 @@ class KegWasher(object):
             log.fatal(error_msg)
             raise Exception(error_msg)
 
+    def _all_heaters_off(self):
+        log.debug(f'Turning all heaters off')
+        for heater in self._heaters.values():
+            heater.off()
+
+    def _all_pumps_off(self):
+        log.debug(f'Turning all pumps off')
+        for pump in self._pumps.values():
+            pump.off()
+
+    def _all_valves_closed(self):
+        log.debug(f'Closing all valves')
+        for valve in self._valves.values():
+            valve.close()
+
+    def _all_off_closed(self):
+        log.debug(f'Turning off all devices, closing all valves')
+        self._all_pumps_off()
+        self._all_heaters_off()
+        self._all_valves_closed()
+
+    def air_fill_closed(self):
+        log.debug('Setting state to air_fill_closed')
+        self._all_off_closed()
+        self._valves['air_in'].open()
+
+    def air_fill_open(self):
+        log.debug('Setting state to air_fill_open')
+        self._all_off_closed()
+        self._valves.get('air_in').open()
+        self._valves.get('waste_out').open()
+
+    def clean_closed(self):
+        log.debug('Setting state to clean_closed')
+        self._all_off_closed()
+        for valve in ['cleaner_in', 'cleaner_rtn', 'pump_in', 'pump_out']:
+            self._valves.get(valve).open()
+        self._pumps.get('pump_1').on()
+        self._heaters.get('heater_1').on()
+
+    def clean_open(self):
+        log.debug('Setting state to clean_open')
+        self._all_off_closed()
+        for valve in ['cleaner_in', 'waste_out', 'pump_in', 'pump_out']:
+            self._valves.get(valve).open()
+        self._pumps.get('pump_1').on()
+        self._heaters.get('header_1').on()
+
+    def cleaner_fill(self):
+        log.debug('Setting state to cleaner_fill')
+        self._all_off_closed()
+        for valve in ['water_in', 'cleaner_in']:
+            self._valves.get(valve).open()
+
+    def co2_fill_closed(self):
+        log.debug('Setting state to co2_fill_closed')
+        self._all_off_closed()
+        self._valves.get('co2_in').open()
+
+    def co2_fill_open(self):
+        log.debug('Setting state to co2_fill_open')
+        self._all_off_closed()
+        self._valves.get('co2_in').open()
+        self._valves.get('waste_out').open()
+
+    def drain(self):
+        log.debug('Setting state to drain')
+        self._all_off_closed()
+        self._valves.get('waste_out').open()
+        self._valves.get('air_in').open()
+
+    def rinse(self):
+        log.debug('Setting state to rinse')
+        self._all_off_closed()
+        for valve in ['water_in', 'pump_in', 'pump_out', 'waste_out']:
+            self._valves.get(valve).open()
+        self._pumps.get('pump_1').on()
+        self._heaters.get('heater_1').on()
+
+    def sanitize(self):
+        log.debug('Setting state to sanitize')
+        self._all_off_closed()
+        for valve in ['sanitizer_in', 'pump_in', 'pump_out', 'waste_out']:
+            self._valves.get(valve).open()
+        self._pumps.get('pump_1').on()
+        self._heaters.get('heater_1').on()
+
+    def sanitizer_fill(self):
+        log.debug('Setting state to santizer fill')
+        self._all_off_closed()
+        for valve in ['water_in', 'sanitizer_in']:
+            self._valves.get(valve).open()
+
+    def aborted_mode(self):
+        log.debug(f'Aborted\nPress Enter')
+        self._display.clear()
+        self._display.message(f'Aborted\nPress Enter')
+
+    def select_mode(self):
+        log.debug(f'Select Mode: {self._modes.data["display_name"]}')
+        self._display.clear()
+        self._display.message(f'Select Mode\n{self._modes.data["display_name"]}')
+
     def sw_abort(self, *args, **kwargs):
         log.debug(f'ABORT Latch Released: received args {args} ;; received kwargs {kwargs}')
+        self._all_off_closed()
+        self._button_lock = False
+        self.update_status('aborted', 1)
 
     def sw_enter(self, *args, **kwargs):
         fall_rise = GPIO.input(args[0])
         log.debug(f'ENTER Button press: received args {args} ;; received kwargs {kwargs} ;; fall_rise {fall_rise}')
+        if self._button_lock:
+            log.debug(f'Button lockout enabled, ignoring')
+            return
 
     def sw_mode(self, *args, **kwargs):
         fall_rise = GPIO.input(args[0])
+        log.debug(f'MODE Button press: received args {args} ;; received kwargs {kwargs} ;; fall_rise {fall_rise}')
+        if self._button_lock:
+            log.debug(f'Button lockout enabled, ignoring')
+            return
         if fall_rise:  # Button Pressed
             self._mode_button_press_time = time.monotonic()
         else:  # Button Released
@@ -305,27 +578,39 @@ class KegWasher(object):
             orig_time = self._mode_button_press_time
             self._mode_button_press_time = cur_time
             delta_time = cur_time - orig_time
-            if delta_time >= 3.5:
+            if delta_time >= 3:
                 log.debug('Previous Mode')
                 self._modes.previous()
-            elif delta_time >= 0.05:
+            elif delta_time >= 0.07:
                 log.debug('Next Mode')
                 self._modes.next()
             else:
                 log.debug('Caught a bounce')
-        log.debug(f'MODE Button press: received args {args} ;; received kwargs {kwargs} ;; fall_rise {fall_rise}')
+        self.update_status('select_mode', 1)
 
     def sw_nc(self, *args, **kwargs):
         fall_rise = GPIO.input(args[0])
         log.debug(f'Not Connected Button press: received args {args} ;; received kwargs {kwargs} ;; fall_rise {fall_rise}')
 
+    def update_status(self, status=None, force=0):
+        if status == self._status and not force:
+            log.debug('No status change, not refreshing display')
+            return
+        if status in self._status_map:
+            log.debug(f'Updating status to {status} - force: {force}')
+            self._status = status
+            self._status_map[status]()
+
     def run(self):
+        log.debug('Pre-infinite run loop')
+        self.update_status('select_mode')
         log.debug('Entering Infinite Loop Handler')
         try:
             while True:
                 time.sleep(200)
 
         except KeyboardInterrupt:
+            self._display.clear()
             GPIO.cleanup()
 
 
