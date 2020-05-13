@@ -9,6 +9,6 @@ class KegwasherException(Exception):
     """
 
 
-class ConfigException(KegwasherException):
+class ConfigError(KegwasherException):
     def __init__(self, message):
-        super(ConfigException, self).__init__(message)
+        super(ConfigError, self).__init__(message)

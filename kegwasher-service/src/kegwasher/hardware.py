@@ -7,6 +7,8 @@ import logging
 import RPi.GPIO as GPIO
 import os
 
+from kegwasher.exceptions import ConfigError
+
 log = logging.getLogger(os.getenv('LOGGER_NAME', 'kegwasher'))
 
 class Display(object):
@@ -43,7 +45,7 @@ class HardwareObject(object):
         if not name:
             error_msg = f'Required attribute "name" not specified'
             log.fatal(error_msg)
-            raise ConfigException(error_msg)
+            raise ConfigError(error_msg)
         self._name = name
         return self.name
 
@@ -56,7 +58,7 @@ class HardwareObject(object):
         if not pin:
             error_msg = f'Required attribute "pin" not specified'
             log.fatal(error_msg)
-            raise ConfigException(error_msg)
+            raise ConfigError(error_msg)
         self._pin = pin
         return self.pin
 
@@ -89,6 +91,29 @@ class Pump(HardwareObject):
     def __init__(self, *args, **kwargs):
         log.debug(f'Registering pump {kwargs.get("name", None)}')
         super(Pump, self).__init__(*args, **kwargs)
+
+
+class Switch(HardwareObject):
+    def __init__(self, *args, **kwargs):
+        log.debug(f'Registering switch {kwargs.get("name", None)}')
+        super(Switch, self).__init__(*args, **kwargs)
+        self._callback = None
+        self.callback = kwargs.get('callback', None)
+
+    @property
+    def callback(self):
+        return self._callback
+
+    @callback.setter
+    def callback(self, callback=None):
+        if not callback:
+            error_msg = f'No callback defined'
+            log.fatal(error_msg)
+            raise ConfigError(error_msg)
+
+    def setup(self):
+        log.debug(f'Setting pin {self.pin} to GPIO.OUT mode')
+        GPIO.setup(self.pin, GPIO.IN)
 
 
 class Valve(HardwareObject):

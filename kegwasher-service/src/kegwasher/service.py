@@ -9,26 +9,13 @@ import threading
 import time
 
 from kegwasher.config import *
-from kegwasher.exceptions import ConfigException
+from kegwasher.exceptions import ConfigError
 from kegwasher.hardware import *
 from kegwasher.linked_list import *
+from kegwasher.operations import Operations
 
 
-#  Setup Logging
-logging_levels = {
-    'CRITICAL': logging.CRITICAL,
-    'ERROR': logging.ERROR,
-    'WARNING': logging.WARNING,
-    'INFO': logging.INFO,
-    'DEBUG': logging.DEBUG
-}
 log = logging.getLogger(os.getenv('LOGGER_NAME', 'kegwasher'))
-handler = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-handler.setFormatter(formatter)
-log.addHandler(handler)
-log.setLevel(logging_levels.get(os.getenv('LOG_LEVEL', 'INFO'), logging.INFO))
-
 
 GPIO.setmode(GPIO.BCM)
 
@@ -48,20 +35,7 @@ class KegWasher(threading.Thread):
             'select_mode': self.select_mode,
             'aborted': self.aborted_mode,
         }
-        self._mode_map = {
-            'air_fill_closed': self.air_fill_closed,
-            'air_fill_open': self.air_fill_open,
-            'clean_closed': self.clean_closed,
-            'clean_open': self.clean_open,
-            'cleaner_fill': self.cleaner_fill,
-            'co2_fill_closed': self.co2_fill_closed,
-            'co2_fill_open': self.co2_fill_open,
-            'drain': self.drain,
-            'rinse': self.rinse,
-            'sanitize': self.sanitize,
-            'sanitizer_fill': self.sanitizer_fill
-        }
-        self._modes = None
+        #
         self._aborted = False
         self._button_lock = False
         self._enabled_loop = True
@@ -70,15 +44,32 @@ class KegWasher(threading.Thread):
         self._status = 'initialize'
         self._threads = []
         #
-        self._validate_hardware_config(pin_config)
-        self._pin_config = pin_config
+        self._pin_config = self._validate_hardware_config(pin_config)
         self._display = Display().init_display(pin_config.get('display'))
         self._display.clear()
         self._display.message(f'Initializing....\nPlease.Standby..')
-        self._heaters = self._init_heaters(pin_config.get('heaters'))
-        self._pumps = self._init_pumps(pin_config.get('pumps'))
-        self._valves = self._init_valves(pin_config.get('valves'))
-        self._switches = self._init_switches(pin_config.get('switches'))
+        self._hardware = dict()
+        self._hardware['heaters'] = self._init_heaters(pin_config.get('heaters'))
+        self._hardware['pumps'] = self._init_pumps(pin_config.get('pumps'))
+        self._hardware['valves'] = self._init_valves(pin_config.get('valves'))
+        self._hardware['switches'] = self._init_switches(pin_config.get('switches'))
+        self._operations = Operations(hardware=self._hardware)
+        #
+        self._modes = None
+        self._mode_map = {
+            'air_fill_closed': self._operations.air_fill_closed,
+            'air_fill_open':   self._operations.air_fill_open,
+            'clean_closed':    self._operations.clean_closed,
+            'clean_open':      self._operations.clean_open,
+            'cleaner_fill':    self._operations.cleaner_fill,
+            'co2_fill_closed': self._operations.co2_fill_closed,
+            'co2_fill_open':   self._operations.co2_fill_open,
+            'drain':           self._operations.drain,
+            'rinse':           self._operations.rinse,
+            'sanitize':        self._operations.sanitize,
+            'sanitizer_fill':  self._operations.sanitizer_fill
+        }
+        #
         self._init_modes(mode_config)
 
     def _init_heaters(self, heaters=list()):
@@ -88,7 +79,7 @@ class KegWasher(threading.Thread):
             if not heater.get('name', None) and not heater.get('pin', None):
                 error_msg = f'Missing correct heater configuration {heater}'
                 log.fatal(error_msg)
-                raise ConfigException(error_msg)
+                raise ConfigError(error_msg)
             configured_heaters[heater.get('name')] = Heater(**heater)
         return configured_heaters
 
@@ -105,7 +96,7 @@ class KegWasher(threading.Thread):
             if not pump.get('name', None) and not pump.get('pin', None):
                 error_msg = f'Missing correct pump configuration {pump}'
                 log.fatal(error_msg)
-                raise ConfigException(error_msg)
+                raise ConfigError(error_msg)
             configured_pumps[pump.get('name')] = Pump(**pump)
         return configured_pumps
 
@@ -120,7 +111,7 @@ class KegWasher(threading.Thread):
                     and not switch.get('callback', None):
                 error_msg = f'Invalid switch configuration: {switch}'
                 log.fatal(error_msg)
-                raise ConfigException(error_msg)
+                raise ConfigError(error_msg)
             log.debug(f'Initializing Switch: {switch.get("name")}')
             GPIO.setup(switch.get('pin', 0), GPIO.IN, pull_up_down=switch.get('PUD', GPIO.PUD_DOWN))
             log.debug(f'Configuring event detection for {switch.get("name")}, callback: {switch.get("callback")}')
@@ -152,99 +143,8 @@ class KegWasher(threading.Thread):
             error_msg = f'Invalid Hardware Configuration Received: {pin_config}'
             log.fatal(error_msg)
             raise Exception(error_msg)
+        return pin_config
 
-    def _all_heaters_off(self):
-        log.debug(f'Turning all heaters off')
-        for heater in self._heaters.keys():
-            self._heaters.get(heater).off()
-
-    def _all_pumps_off(self):
-        log.debug(f'Turning all pumps off')
-        for pump in self._pumps.keys():
-            self._pumps.get(pump).off()
-
-    def _all_valves_closed(self):
-        log.debug(f'Closing all valves')
-        for valve in self._valves.keys():
-            self._valves.get(valve).close()
-
-    def _all_off_closed(self):
-        log.debug(f'Turning off all devices, closing all valves')
-        self._all_pumps_off()
-        self._all_heaters_off()
-        self._all_valves_closed()
-
-    def air_fill_closed(self):
-        log.debug('Setting state to air_fill_closed')
-        self._all_off_closed()
-        self._valves['air_in'].open()
-
-    def air_fill_open(self):
-        log.debug('Setting state to air_fill_open')
-        self._all_off_closed()
-        self._valves.get('air_in').open()
-        self._valves.get('waste_out').open()
-
-    def clean_closed(self):
-        log.debug('Setting state to clean_closed')
-        self._all_off_closed()
-        for valve in ['cleaner_in', 'cleaner_rtn', 'pump_in', 'pump_out']:
-            self._valves.get(valve).open()
-        self._pumps.get('pump_1').on()
-        self._heaters.get('heater_1').on()
-
-    def clean_open(self):
-        log.debug('Setting state to clean_open')
-        self._all_off_closed()
-        for valve in ['cleaner_in', 'waste_out', 'pump_in', 'pump_out']:
-            self._valves.get(valve).open()
-        self._pumps.get('pump_1').on()
-        self._heaters.get('header_1').on()
-
-    def cleaner_fill(self):
-        log.debug('Setting state to cleaner_fill')
-        self._all_off_closed()
-        for valve in ['water_in', 'cleaner_in']:
-            self._valves.get(valve).open()
-
-    def co2_fill_closed(self):
-        log.debug('Setting state to co2_fill_closed')
-        self._all_off_closed()
-        self._valves.get('co2_in').open()
-
-    def co2_fill_open(self):
-        log.debug('Setting state to co2_fill_open')
-        self._all_off_closed()
-        self._valves.get('co2_in').open()
-        self._valves.get('waste_out').open()
-
-    def drain(self):
-        log.debug('Setting state to drain')
-        self._all_off_closed()
-        self._valves.get('waste_out').open()
-        self._valves.get('air_in').open()
-
-    def rinse(self):
-        log.debug('Setting state to rinse')
-        self._all_off_closed()
-        for valve in ['water_in', 'pump_in', 'pump_out', 'waste_out']:
-            self._valves.get(valve).open()
-        self._pumps.get('pump_1').on()
-        self._heaters.get('heater_1').on()
-
-    def sanitize(self):
-        log.debug('Setting state to sanitize')
-        self._all_off_closed()
-        for valve in ['sanitizer_in', 'pump_in', 'pump_out', 'waste_out']:
-            self._valves.get(valve).open()
-        self._pumps.get('pump_1').on()
-        self._heaters.get('heater_1').on()
-
-    def sanitizer_fill(self):
-        log.debug('Setting state to santizer fill')
-        self._all_off_closed()
-        for valve in ['water_in', 'sanitizer_in']:
-            self._valves.get(valve).open()
 
     def aborted_mode(self):
         log.debug(f'Aborted\nPress Enter')
