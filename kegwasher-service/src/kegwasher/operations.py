@@ -2,6 +2,9 @@
 #
 # Copyright (C) 2020 Kyle Hultman <khultman@gmail.com>
 
+import logging
+import os
+
 from kegwasher.exceptions import ConfigError
 
 log = logging.getLogger(os.getenv('LOGGER_NAME', 'kegwasher'))
@@ -14,113 +17,113 @@ class Operations(object):
             log.fatal(error_msg)
             raise ConfigError(error_msg)
 
-    def _heaters_off(self, *args):
+    def heaters_off(self, *args):
         for heater in args:
             log.debug(f'Requesting {heater} heater state to off')
             self._hardware.get('heaters').get(heater).off()
 
-    def _heaters_on(self, *args):
+    def heaters_on(self, *args):
         for heater in args:
             log.debug(f'Requesting {heater} heater state to on')
             self._hardware.get('heaters').get(heater).on()
 
-    def _pumps_off(self, *args):
+    def pumps_off(self, *args):
         for pump in args:
             log.debug(f'Requesting {pump} pump state to off')
             self._hardware.get('pumps').get(pump).off()
 
-    def _pumps_on(self, *args):
+    def pumps_on(self, *args):
         for pump in args:
             log.debug(f'Requesting {pump} pump state to on')
             self._hardware.get('pumps').get(pump).on()
 
-    def _valves_close(self, *args):
+    def valves_close(self, *args):
         for valve in args:
             log.debug(f'Requesting {valve} valve state to closed')
             self._hardware.get('valves').get(valve).close()
 
-    def _valves_open(self, *args):
+    def valves_open(self, *args):
         for valve in args:
             log.debug(f'Requesting {valve} valve state to open')
             self._hardware.get('valves').get(valve).open()
 
-    def _all_heaters_off(self):
+    def all_heaters_off(self):
         log.debug(f'Requesting all heaters off')
-        self._heaters_off(*self._hardware.get('heaters').keys())
+        self.heaters_off(*self._hardware.get('heaters').keys())
 
-    def _all_pumps_off(self):
+    def all_pumps_off(self):
         log.debug(f'Requesting all pumps off')
-        self._pumps_off(*self._hardware.get('pumps').keys())
+        self.pumps_off(*self._hardware.get('pumps').keys())
 
-    def _all_valves_closed(self):
+    def all_valves_closed(self):
         log.debug(f'Requisting all valves closed')
-        self._valves_close(*self._hardware.get('valves').keys())
+        self.valves_close(*self._hardware.get('valves').keys())
 
-    def _all_off_closed(self):
+    def all_off_closed(self):
         log.debug(f'Requesting all devices off, all valves closed')
-        self._all_pumps_off()
-        self._all_heaters_off()
-        self._all_valves_closed()
+        self.all_pumps_off()
+        self.all_heaters_off()
+        self.all_valves_closed()
 
     def air_fill_closed(self):
         log.debug('Operation state air_fill_closed')
-        self._all_off_closed()
-        self._valves_open('air_in')
+        self.all_off_closed()
+        self.valves_open('air_in')
 
     def air_fill_open(self):
         log.debug('Operation state air_fill_open')
-        self._all_off_closed()
-        self._valves_open('air_in', 'waste_out')
+        self.all_off_closed()
+        self.valves_open('air_in', 'waste_out')
 
     def clean_closed(self):
         log.debug('Operation state clean_closed')
-        self._all_off_closed()
-        self._valves_open('cleaner_in', 'cleaner_rtn', 'pump_in', 'pump_out')
-        self._pumps_on('pump_1')
-        self._heaters_on('heater_1')
+        self.all_off_closed()
+        self.valves_open('cleaner_in', 'cleaner_rtn', 'pump_in', 'pump_out')
+        self.pumps_on('pump_1')
+        self.heaters_on('heater_1')
 
     def clean_open(self):
         log.debug('Operation state clean_open')
-        self._all_off_closed()
-        self._valves_open('cleaner_in', 'waste_out', 'pump_in', 'pump_out')
-        self._pumps_on('pump_1')
-        self._heaters_on('header_1')
+        self.all_off_closed()
+        self.valves_open('cleaner_in', 'waste_out', 'pump_in', 'pump_out')
+        self.pumps_on('pump_1')
+        self.heaters_on('header_1')
 
     def cleaner_fill(self):
         log.debug('Operation state cleaner_fill')
-        self._all_off_closed()
-        self._valves_open('water_in', 'cleaner_in')
+        self.all_off_closed()
+        self.valves_open('water_in', 'cleaner_in')
 
     def co2_fill_closed(self):
         log.debug('Operation state co2_fill_closed')
-        self._all_off_closed()
-        self._valves_open('co2_in')
+        self.all_off_closed()
+        self.valves_open('co2_in')
 
     def co2_fill_open(self):
         log.debug('Operation state co2_fill_open')
-        self._all_off_closed()
-        self._valves_open('co2_in', 'waste_out')
+        self.all_off_closed()
+        self.valves_open('co2_in', 'waste_out')
 
     def drain(self):
         log.debug('Operation state drain')
-        self._all_off_closed()
-        self._valves_open('waste_out', 'air_in')
+        self.all_off_closed()
+        self.valves_open('waste_out', 'air_in')
 
     def rinse(self):
         log.debug('Operation state rinse')
-        self._all_off_closed()
-        self._valves_open('water_in', 'pump_in', 'pump_out', 'waste_out')
-        self._pumps_on('pump_1')
-        self._heaters_on('heater_1')
+        self.all_off_closed()
+        self.valves_open('water_in', 'pump_in', 'pump_out', 'waste_out')
+        self.pumps_on('pump_1')
+        self.heaters_on('heater_1')
 
     def sanitize(self):
         log.debug('Operation state sanitize')
-        self._all_off_closed()
-        self._valves_open('sanitizer_in', 'pump_in', 'pump_out', 'waste_out'):
-        self._pumps_on('pump_1')
-        self._heaters_on('heater_1')
+        self.all_off_closed()
+        self.valves_open('sanitizer_in', 'pump_in', 'pump_out', 'waste_out')
+        self.pumps_on('pump_1')
+        self.heaters_on('heater_1')
 
     def sanitizer_fill(self):
         log.debug('Operation state santizer_fill')
-        self._all_off_closed()
-        self._valves_open('water_in', 'sanitizer_in')
+        self.all_off_closed()
+        self.valves_open('water_in', 'sanitizer_in')

@@ -54,6 +54,7 @@ class KegWasher(threading.Thread):
         self._hardware['valves'] = self._init_valves(pin_config.get('valves'))
         self._hardware['switches'] = self._init_switches(pin_config.get('switches'))
         self._operations = Operations(hardware=self._hardware)
+        self._operations.all_off_closed()
         #
         self._modes = None
         self._mode_map = {
@@ -72,7 +73,8 @@ class KegWasher(threading.Thread):
         #
         self._init_modes(mode_config)
 
-    def _init_heaters(self, heaters=list()):
+    @staticmethod
+    def _init_heaters(heaters=list()):
         log.debug(f'Initializing heaters')
         configured_heaters = dict()
         for heater in heaters:
@@ -89,7 +91,8 @@ class KegWasher(threading.Thread):
         for mode, data in modes.items():
             self._modes.append(Node(data))
 
-    def _init_pumps(self, pumps=list()):
+    @staticmethod
+    def _init_pumps(pumps=list()):
         log.debug(f'Initializing pumps')
         configured_pumps = dict()
         for pump in pumps:
@@ -112,16 +115,16 @@ class KegWasher(threading.Thread):
                 error_msg = f'Invalid switch configuration: {switch}'
                 log.fatal(error_msg)
                 raise ConfigError(error_msg)
-            log.debug(f'Initializing Switch: {switch.get("name")}')
-            GPIO.setup(switch.get('pin', 0), GPIO.IN, pull_up_down=switch.get('PUD', GPIO.PUD_DOWN))
+            name = switch.get('name')
+            configured_switches[name] = Switch(**switch)
             log.debug(f'Configuring event detection for {switch.get("name")}, callback: {switch.get("callback")}')
-            GPIO.add_event_detect(switch.get('pin', 0),
-                                  switch.get('event', GPIO.BOTH),
-                                  self._switch_callbacks.get(switch.get('callback', 'sw_nc'), self.sw_nc))
-            configured_switches[switch.get('name')] = switch
+            GPIO.add_event_detect(configured_switches[name].pin,
+                                  configured_switches[name].event,
+                                  self._switch_callbacks.get(configured_switches[name].callback, self.sw_nc))
         return configured_switches
 
-    def _init_valves(self, valves=list()):
+    @staticmethod
+    def _init_valves(valves=list()):
         log.debug(f'Initializing valves')
         configured_valves = dict()
         for valve in valves:
@@ -132,7 +135,8 @@ class KegWasher(threading.Thread):
             configured_valves[valve.get('name')] = Valve(**valve)
         return configured_valves
 
-    def _validate_hardware_config(self, pin_config=None):
+    @staticmethod
+    def _validate_hardware_config(pin_config=None):
         log.debug(f'Validating hardware configuration')
         if not (pin_config and
                 pin_config.get('display', None) and
@@ -144,7 +148,6 @@ class KegWasher(threading.Thread):
             log.fatal(error_msg)
             raise Exception(error_msg)
         return pin_config
-
 
     def aborted_mode(self):
         log.debug(f'Aborted\nPress Enter')
@@ -169,7 +172,7 @@ class KegWasher(threading.Thread):
 
     def sw_abort(self, *args, **kwargs):
         log.debug(f'ABORT Latch Released: received args {args} ;; received kwargs {kwargs}')
-        self._all_off_closed()
+        self._operations.all_off_closed()
         self._button_lock = False
         self.update_status('aborted', 1)
 
@@ -214,7 +217,7 @@ class KegWasher(threading.Thread):
 
     def sw_nc(self, *args, **kwargs):
         fall_rise = GPIO.input(args[0])
-        log.debug(f'Not Connected Button press: received args {args} ;; received kwargs {kwargs} ;; fall_rise {fall_rise}')
+        log.debug(f'NC Button press: received args {args} ;; received kwargs {kwargs} ;; fall_rise {fall_rise}')
 
     def update_status(self, status=None, force=0):
         if status == self._status and not force:
@@ -232,7 +235,6 @@ class KegWasher(threading.Thread):
         try:
             while self._enabled_loop:
                 time.sleep(1e6)
-
         except KeyboardInterrupt:
             self._display.clear()
             GPIO.cleanup()

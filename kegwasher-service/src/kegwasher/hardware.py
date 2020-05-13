@@ -96,9 +96,13 @@ class Pump(HardwareObject):
 class Switch(HardwareObject):
     def __init__(self, *args, **kwargs):
         log.debug(f'Registering switch {kwargs.get("name", None)}')
-        super(Switch, self).__init__(*args, **kwargs)
         self._callback = None
+        self._event = None
+        self._PUD = None
         self.callback = kwargs.get('callback', None)
+        self.event = kwargs.get('event', None)
+        self.PUD = kwargs.get('PUD', None)
+        super(Switch, self).__init__(*args, **kwargs)
 
     @property
     def callback(self):
@@ -110,10 +114,38 @@ class Switch(HardwareObject):
             error_msg = f'No callback defined'
             log.fatal(error_msg)
             raise ConfigError(error_msg)
+        self._callback = callback
+        return self.callback
+
+    @property
+    def event(self):
+        return self._event
+
+    @event.setter
+    def event(self, event=None):
+        if not event:
+            error_msg = f'No event defined'
+            log.fatal(error_msg)
+            raise ConfigError(error_msg)
+        self._event = event
+        return self.event
+
+    @property
+    def PUD(self):
+        return self._PUD
+
+    @PUD.setter
+    def PUD(self, PUD=None):
+        if not PUD:
+            error_msg = f'No PUD defined'
+            log.fata(error_msg)
+            raise ConfigError(error_msg)
+        self._PUD = PUD
+        return self.PUD
 
     def setup(self):
-        log.debug(f'Setting pin {self.pin} to GPIO.OUT mode')
-        GPIO.setup(self.pin, GPIO.IN)
+        log.debug(f'Setting pin {self.pin} to GPIO.IN mode, Pull-UP/DOWN resistor to {self.PUD}')
+        GPIO.setup(self.pin, GPIO.IN, pull_up_down=self.PUD)
 
 
 class Valve(HardwareObject):
