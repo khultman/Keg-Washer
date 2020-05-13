@@ -2,164 +2,17 @@
 #
 # Copyright (C) 2020 Kyle Hultman <khultman@gmail.com>
 
-import Adafruit_CharLCD as LCD
 import logging
 import os
 import RPi.GPIO as GPIO
 import threading
 import time
 
+from kegwasher.config import *
+from kegwasher.exceptions import ConfigException
+from kegwasher.hardware import *
+from kegwasher.linked_list import *
 
-# Mode Configuration
-# Available Mode Operations
-# air_fill_closed   - Fill keg with air, all other valves closed
-# air_fill_open     - Fill keg with air, waste_out valve on
-# clean_closed      - Closed loop clean: cleaner_in, cleaner_rtn & pump valves on, pump on
-# clean_open        - Open loop clean: cleaner_in, waste_out & pump valves on, pump on
-# co2_fill_closed   - Fill keg with CO2, all other valves closed
-# co2_fill_open     - Fill keg with CO2, waste_out valve on
-# drain             - waste_out valve on, all other valves closed
-# rinse             - water_in, waste_out & pump valves on, pump on
-# sanitize          - sanitizer_in, waste_out & pump valves on, pump on
-mode_config = {
-    'clean': {
-        'display_name': 'Clean',
-        'operations': [
-            #  Operation         Time to Run Operation
-            ('air_fill_open',    30),
-            ('rinse',            300),
-            ('air_fill_open',    10),
-            ('drain',            30),
-            ('clean_open',       30),
-            ('clean_closed',     300),
-            ('air_fill_open',    10),
-            ('drain',            30),
-            ('rinse',            60),
-            ('co2_fill_open',    10),
-            ('drain',            30),
-            ('sanitize',         120),
-            ('co2_fill_open',    10),
-            ('drain',            30),
-            ('co2_fill_open',    5),
-            ('co2_fill_closed',  25)
-        ]
-    },
-    'deep_clean': {
-        'display_name': 'Deep Clean',
-        'operations': [
-            #  Operation         Time to Run Operation
-            ('air_fill_open',    30),
-            ('air_fill_closed',  10),
-            ('drain',            30),
-            ('rinse',            300),
-            ('air_fill_open',    10),
-            ('drain',            30),
-            ('clean_open',       30),
-            ('clean_closed',     300),
-            ('air_fill_open',    10),
-            ('drain',            30),
-            ('rinse',            60),
-            ('clean_open',       30),
-            ('clean_closed',     300),
-            ('drain',            30),
-            ('co2_fill_open',    10),
-            ('rinse',            60),
-            ('co2_fill_open',    10),
-            ('drain',            30),
-            ('sanitize',         120),
-            ('co2_fill_open',    10),
-            ('drain',            30),
-            ('co2_fill_open',    5),
-            ('co2_fill_closed',  25)
-        ]
-    },
-    'sanitize': {
-        'display_name': 'Sanitize',
-        'operations': [
-            #  Operation         Time to Run Operation
-            ('co2_fill_closed',  5),
-            ('co2_fill_open',    5),
-            ('drain',            30),
-            ('sanitize',         120),
-            ('co2_fill_open',    10),
-            ('drain',            30),
-            ('co2_fill_open',    5),
-            ('co2_fill_closed',  25)
-        ]
-    },
-    'rinse_empty': {
-        'display_name': 'Rinse & Empty',
-        'operations': [
-            #  Operation         Time to Run Operation
-            ('air_fill_open',    30),
-            ('air_fill_closed',  10),
-            ('drain',            30),
-            ('rinse',            300),
-            ('air_fill_open',    10),
-            ('drain',            60),
-        ]
-    },
-    'sanitizer_fill': {
-        'display_name': 'Fill Sanitizer',
-        'operations': [
-            #  Operation         Time to Run Operation
-            ('santizer_fill',    10)
-        ]
-    },
-    'cleaner_fill': {
-        'display_name': 'Fill Cleaner',
-        'operations': [
-            #  Operation         Time to Run Operation
-            ('cleaner_fill',     10)
-        ]
-    }
-}
-
-# Hardware Configuration
-pin_config = {
-    'display': {
-        'lcd_rs':       {'pin': 16},
-        'lcd_en':       {'pin': 19},
-        'lcd_d4':       {'pin': 7},
-        'lcd_d5':       {'pin': 8},
-        'lcd_d6':       {'pin': 10},
-        'lcd_d7':       {'pin': 9},
-        'lcd_bl':       {'pin': 0},
-        'lcd_columns':  16,
-        'lcd_rows':     2
-    },
-    'heaters': [
-        {'name': 'heater_1',     'pin': 11}
-    ],
-    'pumps': [
-        {'name': 'pump_1',       'pin': 27}
-    ],
-    'switches': [
-        {'name': 'mode',         'pin': 5,    'PUD': GPIO.PUD_DOWN,   'event': GPIO.BOTH,      'callback': 'sw_mode'},
-        {'name': 'enter',        'pin': 6,    'PUD': GPIO.PUD_DOWN,   'event': GPIO.BOTH,      'callback': 'sw_enter'},
-        {'name': 'sw_3',         'pin': 12,   'PUD': GPIO.PUD_DOWN,   'event': GPIO.BOTH,      'callback': 'sw_nc'},
-        {'name': 'sw_4',         'pin': 13,   'PUD': GPIO.PUD_DOWN,   'event': GPIO.BOTH,      'callback': 'sw_nc'},
-        {'name': 'abort',        'pin': 20,   'PUD': GPIO.PUD_DOWN,   'event': GPIO.RISING,    'callback': 'sw_abort'}
-    ],
-    'valves': [
-        {'name': 'cleaner_in',   'pin': 21},
-        {'name': 'sanitizer_in', 'pin': 26},
-        {'name': 'water_in',     'pin': 4},
-        {'name': 'pump_in',      'pin': 17},
-        {'name': 'co2_in',       'pin': 18},
-        {'name': 'air_in',       'pin': 22},
-        {'name': 'cleaner_rtn',  'pin': 23},
-        {'name': 'pump_out',     'pin': 24},
-        {'name': 'waste_out',    'pin': 25}
-    ]
-}
-
-
-########################################################################################################################
-########################################################################################################################
-########################################### END USER CONFIGURATION #####################################################
-########################################################################################################################
-########################################################################################################################
 
 #  Setup Logging
 logging_levels = {
@@ -176,163 +29,14 @@ handler.setFormatter(formatter)
 log.addHandler(handler)
 log.setLevel(logging_levels.get(os.getenv('LOG_LEVEL', 'INFO'), logging.INFO))
 
+
 GPIO.setmode(GPIO.BCM)
 
 
-class KegwasherException(Exception):
-    """
-    Base Exception Class
-    """
-
-
-class ConfigException(KegwasherException):
-    def __init__(self, message):
-        super(ConfigException, self).__init__(message)
-
-class CleaningMode(object):
-    def __init__(self, data):
-        self.data = data
-        self.next = None
-        self.previous = None
-
-
-class ModeList(object):
-    def __init__(self):
-        self.head = None
-        
-    @property
-    def data(self):
-        cur_node = self.head
-        if cur_node is None:
-            return None
-        return cur_node.data
-
-    def get_node(self, index):
-        cur_node = self.head
-        for i in range(index):
-            cur_node = cur_node.next
-            if cur_node == self.head:
-                return None
-            return cur_node
-
-    def insert_after(self, ref_node, new_node):
-        new_node.previous = ref_node
-        new_node.next = ref_node.next
-        new_node.next.previous = new_node
-        ref_node.next = new_node
-
-    def insert_before(self, ref_node, new_node):
-        self.insert_after(ref_node.previous, new_node)
-
-    def append(self, new_node=None):
-        if self.head is None:
-            new_node.next = new_node
-            new_node.previous = new_node
-            self.head = new_node
-        else:
-            self.insert_after(self.head.previous, new_node)
-
-    def push(self, new_node=None):
-        self.append(new_node)
-        self.head = new_node
-
-    def next(self):
-        self.head = self.head.next
-
-    def previous(self):
-        self.head = self.head.previous
-
-
-class HardwareObject(object):
-    def __init__(self, *args, **kwargs):
-        log.debug(f'Making hardware object\t\targs: {args}\t\tkwargs: {kwargs}')
-        self._name = None
-        self._pin = None
-        self.name = kwargs.get('name', None)
-        self.pin = kwargs.get('pin', None)
-        self.setup()
-
-    @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, name=None):
-        if not name:
-            error_msg = f'Required attribute "name" not specified'
-            log.fatal(error_msg)
-            raise ConfigException(error_msg)
-        self._name = name
-        return self.name
-
-    @property
-    def pin(self):
-        return self._pin
-
-    @pin.setter
-    def pin(self, pin):
-        if not pin:
-            error_msg = f'Required attribute "pin" not specified'
-            log.fatal(error_msg)
-            raise ConfigException(error_msg)
-        self._pin = pin
-        return self.pin
-
-    def close(self):
-        self.off()
-
-    def off(self):
-        log.debug(f'Setting pin {self.pin} to OFF/Low Voltage')
-        GPIO.output(self.pin, 0)
-
-    def on(self):
-        log.debug(f'Setting pin {self.pin} to ON/High Voltage')
-        GPIO.output(self.pin, 1)
-
-    def open(self):
-        self.on()
-
-    def setup(self):
-        log.debug(f'Setting pin {self.pin} to GPIO.OUT mode')
-        GPIO.setup(self.pin, GPIO.OUT)
-
-
-class Display(object):
-    def init_display(self, display=dict()):
-        log.debug(f'Initializing Display Driver')
-        lcd = LCD.Adafruit_CharLCD(
-            display.get('lcd_rs').get('pin'),
-            display.get('lcd_en').get('pin'),
-            display.get('lcd_d4').get('pin'),
-            display.get('lcd_d5').get('pin'),
-            display.get('lcd_d6').get('pin'),
-            display.get('lcd_d7').get('pin'),
-            display.get('lcd_columns'),
-            display.get('lcd_rows'),
-            display.get('lcd_bl').get('pin'))
-        return lcd
-
-class Heater(HardwareObject):
-    def __init__(self, *args, **kwargs):
-        log.debug(f'Registering heater {kwargs.get("name", None)}')
-        super(Heater, self).__init__(*args, **kwargs)
-
-
-class Pump(HardwareObject):
-    def __init__(self, *args, **kwargs):
-        log.debug(f'Registering pump {kwargs.get("name", None)}')
-        super(Pump, self).__init__(*args, **kwargs)
-
-
-class Valve(HardwareObject):
-    def __init__(self, *args, **kwargs):
-        log.debug(f'Registering valve {kwargs.get("name", None)}')
-        super(Valve, self).__init__(*args, **kwargs)
-
-
-class KegWasher(object):
+class KegWasher(threading.Thread):
     def __init__(self, pin_config=None, mode_config=None):
         log.debug(f'Initializing KegWasher')
+        threading.Thread.__init__(self)
         self._switch_callbacks = {
             'sw_abort': self.sw_abort,
             'sw_enter': self.sw_enter,
@@ -360,9 +64,11 @@ class KegWasher(object):
         self._modes = None
         self._aborted = False
         self._button_lock = False
-        self._mode_button_press_time = 0
+        self._enabled_loop = True
         self._enter_button_press_time = 0
+        self._mode_button_press_time = 0
         self._status = 'initialize'
+        self._threads = []
         #
         self._validate_hardware_config(pin_config)
         self._pin_config = pin_config
@@ -388,9 +94,9 @@ class KegWasher(object):
 
     def _init_modes(self, modes=None):
         log.debug(f'Creating circular doubly linked list from defined modes')
-        self._modes = ModeList()
+        self._modes = CircularDoublyLinkedList()
         for mode, data in modes.items():
-            self._modes.append(CleaningMode(data))
+            self._modes.append(Node(data))
 
     def _init_pumps(self, pumps=list()):
         log.debug(f'Initializing pumps')
@@ -579,7 +285,8 @@ class KegWasher(object):
             log.debug(f'Button lockout enabled, ignoring')
             return
         t = threading.Thread(target=self.execute_mode())
-        t.daemon = True
+        t.daemon = False
+        self._threads.append(t)
         t.start()
 
     def sw_mode(self, *args, **kwargs):
@@ -623,19 +330,10 @@ class KegWasher(object):
         self.update_status('select_mode')
         log.debug('Entering Infinite Loop Handler')
         try:
-            while True:
+            while self._enabled_loop:
                 time.sleep(1e6)
 
         except KeyboardInterrupt:
             self._display.clear()
             GPIO.cleanup()
 
-
-
-if __name__ == '__main__':
-    try:
-        keg_washer = KegWasher(pin_config, mode_config)
-        keg_washer.run()
-    except KeyboardInterrupt:
-        GPIO.cleanup()
-    GPIO.cleanup()
