@@ -149,15 +149,6 @@ class KegWasher(threading.Thread):
     def run(self):
         log.debug('Entering Infinite Loop Handler')
         try:
-            t = Action(**{'action': 'display_mode_select',
-                          'hardware': self._hardware,
-                          'modes': self._modes,
-                          'operations': self._operations,
-                          'state': self._state,
-                          'threads': self._threads})
-            t.daemon = False
-            t.start()
-            self._threads.append(t)
             while self._state.get('alive', False):
                 if self._state.get('aborted', False):
                     time.sleep(1)
@@ -167,11 +158,30 @@ class KegWasher(threading.Thread):
                             if t.is_alive():
                                 t.join(timeout=0.01)
                             if not t.is_alive():
+                                log.debug('Reaping thread')
                                 self._threads.remove(t)
+                    if self._state['status'] == 'execute_mode' or self._state['status'] == 'initialize':
+                        act = self._state['status']
+                        if self._state['status'] == 'execute_mode':
+                            self._state['status'] = 'executing'
+                        if self._state['status'] == 'initialize':
+                            act = 'display_mode_select'
+                            self._state['status'] = 'select_mode'
+                        self._state['status'] = 'executing'
+                        t = Action(**{'action': act,
+                                      'hardware': self._hardware,
+                                      'modes': self._modes,
+                                      'operations': self._operations,
+                                      'state': self._state,
+                                      'threads': self._threads})
+                        t.daemon = False
+                        t.start()
+                        self._threads.append(t)
                     time.sleep(0.01)
         except KeyboardInterrupt:
             log.info('Received Keyboard Interrupt')
             self._display.clear()
+            self._operations.all_off_closed()
             GPIO.cleanup()
 
 

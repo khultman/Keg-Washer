@@ -42,10 +42,12 @@ class Action(threading.Thread):
         elif not self._hardware.get('switches').get('abort').state:
             log.debug(f'Abort switch reset, resuming operation')
             self._state['aborted'] = False
+            self._state['status'] = 'initialize'
         else:
             log.debug(f'Aborting')
             self._operations.all_off_closed()
             self._state['aborted'] = True
+            self._state['status'] = 'aborted'
             self._hardware.get('display').clear()
             self._hardware.get('display').message(f'Aborted\nReset Controller')
             for t in self._threads:
@@ -59,17 +61,15 @@ class Action(threading.Thread):
 
     def enter(self):
         if self._hardware.get('switches').get('enter').state:
-            self._state['enter_button_press_time'] = time.monotonic
+            self._state['enter_button_press_time'] = time.monotonic()
             log.debug(f'Enter button pressed at {self._state["enter_button_press_time"]}')
         else:
             delta = time.monotonic() - self._state['enter_button_press_time']
             self._state['enter_button_press_time'] = 0
             log.debug(f'Enter button released, held for {round(delta, 3)} seconds')
-            if self._state['aborted']:
-                self._state['aborted'] = False
-            else:
-                log.debug('Executing Mode')
-                self._state['button_lock'] = True
+            log.debug('Executing Mode')
+            self._state['button_lock'] = True
+            self._state['status'] = 'execute_mode'
 
     def execute_mode(self):
         log.debug(f'Executing Mode: {self._modes.data["display_name"]}')
@@ -78,8 +78,8 @@ class Action(threading.Thread):
             log.debug(f'Cmd: {cmd}, time: {t}')
             self._mode_operation_map[cmd]()
             for i in range(0, t):
-                self._display.clear()
-                self._display.message(f'{cmd}\nTime Left: {t - i}')
+                self._hardware.get('display').clear()
+                self._hardware.get('display').message(f'{cmd}\nTime Left: {t - i}')
                 time.sleep(1)
 
     def mode(self):
@@ -100,6 +100,8 @@ class Action(threading.Thread):
         log.debug(f'Execution action {self._action}')
         if self._action.lower() == 'abort':
             self.abort()
+        elif self._action.lower() == 'execute_mode':
+            self.execute_mode()
         elif self._state.get('button_lock', False):
             log.debug('Control Panel Lockout Enabled, ignoring button press')
         elif self._action.lower() == 'mode':
@@ -111,27 +113,3 @@ class Action(threading.Thread):
         else:
             log.debug('Unknown action, ignoring')
 
-    def sw_enter(self, *args, **kwargs):
-        fall_rise = GPIO.input(args[0])
-        log.debug(f'ENTER Button press: received args {args} ;; received kwargs {kwargs} ;; fall_rise {fall_rise}')
-        if self._aborted:
-            log.debug(f'Resetting abort state')
-            self._aborted = False
-            self.update_status('select_mode')
-            return
-        if self._button_lock:
-            log.debug(f'Button lockout enabled, ignoring')
-            return
-        t = threading.Thread(target=self.execute_mode())
-        t.daemon = False
-        self._threads.append(t)
-        t.start()
-
-    def update_status(self, status=None, force=0):
-        if status == self._status and not force:
-            log.debug('No status change, not refreshing display')
-            return
-        if status in self._status_map:
-            log.debug(f'Updating status to {status} - force: {force}')
-            self._status = status
-            self._status_map[status]()
