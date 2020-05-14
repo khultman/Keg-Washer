@@ -45,10 +45,10 @@ class KegWasher(threading.Thread):
         self._threads = []
         #
         self._pin_config = self._validate_hardware_config(pin_config)
-        self._display = Display().init_display(pin_config.get('display'))
-        self._display.clear()
-        self._display.message(f'Initializing....\nPlease.Standby..')
         self._hardware = dict()
+        self._hardware['display'] = Display().init_display(pin_config.get('display'))
+        self._hardware.get('display').clear()
+        self._hardware.get('display').message(f'Initializing....\nPlease.Standby..')
         self._hardware['heaters'] = self._init_heaters(pin_config.get('heaters'))
         self._hardware['pumps'] = self._init_pumps(pin_config.get('pumps'))
         self._hardware['valves'] = self._init_valves(pin_config.get('valves'))
@@ -111,16 +111,16 @@ class KegWasher(threading.Thread):
                     and not switch.get('pin', None) \
                     and not switch.get('PUD', None) \
                     and not switch.get('event', None) \
-                    and not switch.get('callback', None):
+                    and not switch.get('action', None):
                 error_msg = f'Invalid switch configuration: {switch}'
                 log.fatal(error_msg)
                 raise ConfigError(error_msg)
             name = switch.get('name')
             configured_switches[name] = Switch(**switch)
-            log.debug(f'Configuring event detection for {switch.get("name")}, callback: {switch.get("callback")}')
+            log.debug(f'Configuring event detection for {switch.get("name")}, action: {switch.get("action")}')
             GPIO.add_event_detect(configured_switches[name].pin,
                                   configured_switches[name].event,
-                                  self._switch_callbacks.get(configured_switches[name].callback, self.sw_nc))
+                                  self._switch_callbacks.get(configured_switches[name].action, self.sw_nc))
         return configured_switches
 
     @staticmethod
@@ -148,27 +148,6 @@ class KegWasher(threading.Thread):
             log.fatal(error_msg)
             raise Exception(error_msg)
         return pin_config
-
-    def aborted_mode(self):
-        log.debug(f'Aborted\nPress Enter')
-        self._display.clear()
-        self._display.message(f'Aborted\nPress Enter')
-
-    def select_mode(self):
-        log.debug(f'Select Mode: {self._modes.data["display_name"]}')
-        self._display.clear()
-        self._display.message(f'Select Mode\n{self._modes.data["display_name"]}')
-
-    def execute_mode(self):
-        log.debug(f'Executing Mode: {self._modes.data["display_name"]}')
-        operations = self._modes.data.get('operations')
-        for cmd, t in operations:
-            log.debug(f'Cmd: {cmd}, time: {t}')
-            self._mode_map[cmd]()
-            for i in range(0, t):
-                self._display.clear()
-                self._display.message(f'{cmd}\nTime Left: {t - i}')
-                time.sleep(1)
 
     def sw_abort(self, *args, **kwargs):
         log.debug(f'ABORT Latch Released: received args {args} ;; received kwargs {kwargs}')
@@ -242,5 +221,6 @@ class KegWasher(threading.Thread):
 
 if __name__ == '__main__':
     keg_washer = KegWasher(pin_config, mode_config)
+    keg_washer.daemon = True
     keg_washer.start()
 

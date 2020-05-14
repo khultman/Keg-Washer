@@ -96,26 +96,26 @@ class Pump(HardwareObject):
 class Switch(HardwareObject):
     def __init__(self, *args, **kwargs):
         log.debug(f'Registering switch {kwargs.get("name", None)}')
-        self._callback = None
+        self._action = None
         self._event = None
         self._PUD = None
-        self.callback = kwargs.get('callback', None)
+        self.action = kwargs.get('action', None)
         self.event = kwargs.get('event', None)
         self.PUD = kwargs.get('PUD', None)
         super(Switch, self).__init__(*args, **kwargs)
 
     @property
-    def callback(self):
-        return self._callback
+    def action(self):
+        return self._action
 
-    @callback.setter
-    def callback(self, callback=None):
+    @action.setter
+    def action(self, callback=None):
         if not callback:
-            error_msg = f'No callback defined'
+            error_msg = f'No action defined'
             log.fatal(error_msg)
             raise ConfigError(error_msg)
-        self._callback = callback
-        return self.callback
+        self._action = callback
+        return self.action
 
     @property
     def event(self):

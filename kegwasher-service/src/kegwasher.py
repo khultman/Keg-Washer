@@ -7,4 +7,5 @@ from kegwasher.service import KegWasher
 
 if __name__ == '__main__':
     keg_washer = KegWasher(pin_config, mode_config)
+    keg_washer.daemon = True
     keg_washer.start()
