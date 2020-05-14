@@ -8,6 +8,7 @@ import RPi.GPIO as GPIO
 import threading
 import time
 
+from kegwasher.actions import Action
 from kegwasher.config import pin_config, mode_config
 from kegwasher.exceptions import ConfigError
 from kegwasher.hardware import *
@@ -24,25 +25,21 @@ class KegWasher(threading.Thread):
     def __init__(self, pin_config=None, mode_config=None):
         log.debug(f'Initializing KegWasher')
         threading.Thread.__init__(self)
-        self._switch_callbacks = {
-            'sw_abort': self.sw_abort,
-            'sw_enter': self.sw_enter,
-            'sw_mode': self.sw_mode,
-            'sw_nc': self.sw_nc
-        }
-        self._status_map = {
-            'initialize': self.__init__,
-            'select_mode': self.select_mode,
-            'aborted': self.aborted_mode,
-        }
+        # self._status_map = {
+        #     'initialize': self.__init__,
+        #     'select_mode': self.select_mode,
+        #     'aborted': self.aborted_mode,
+        # }
         #
-        self._aborted = False
-        self._button_lock = False
-        self._enabled_loop = True
-        self._enter_button_press_time = 0
-        self._mode_button_press_time = 0
-        self._status = 'initialize'
-        self._threads = []
+        self._state = {
+            'aborted': False,
+            'alive': True,
+            'button_lock': False,
+            'enter_button_press_time': 0,
+            'mode_button_press_time': 0,
+            'status': 'initialize'
+        }
+        self._threads = list()
         #
         self._pin_config = self._validate_hardware_config(pin_config)
         self._hardware = dict()
@@ -56,22 +53,7 @@ class KegWasher(threading.Thread):
         self._operations = Operations(hardware=self._hardware)
         self._operations.all_off_closed()
         #
-        self._modes = None
-        self._mode_map = {
-            'air_fill_closed': self._operations.air_fill_closed,
-            'air_fill_open':   self._operations.air_fill_open,
-            'clean_closed':    self._operations.clean_closed,
-            'clean_open':      self._operations.clean_open,
-            'cleaner_fill':    self._operations.cleaner_fill,
-            'co2_fill_closed': self._operations.co2_fill_closed,
-            'co2_fill_open':   self._operations.co2_fill_open,
-            'drain':           self._operations.drain,
-            'rinse':           self._operations.rinse,
-            'sanitize':        self._operations.sanitize,
-            'sanitizer_fill':  self._operations.sanitizer_fill
-        }
-        #
-        self._init_modes(mode_config)
+        self._modes = self._init_modes(mode_config)
 
     @staticmethod
     def _init_heaters(heaters=list()):
@@ -85,11 +67,13 @@ class KegWasher(threading.Thread):
             configured_heaters[heater.get('name')] = Heater(**heater)
         return configured_heaters
 
-    def _init_modes(self, modes=None):
+    @staticmethod
+    def _init_modes(modes=None):
         log.debug(f'Creating circular doubly linked list from defined modes')
-        self._modes = CircularDoublyLinkedList()
+        cdll = CircularDoublyLinkedList()
         for mode, data in modes.items():
-            self._modes.append(Node(data))
+            cdll.append(Node(data))
+        return cdll
 
     @staticmethod
     def _init_pumps(pumps=list()):
@@ -115,12 +99,13 @@ class KegWasher(threading.Thread):
                 error_msg = f'Invalid switch configuration: {switch}'
                 log.fatal(error_msg)
                 raise ConfigError(error_msg)
+            pin = switch.get('pin')
             name = switch.get('name')
-            configured_switches[name] = Switch(**switch)
+            switch_object = Switch(**switch)
+            configured_switches[pin] = switch_object
+            configured_switches[name] = switch_object
             log.debug(f'Configuring event detection for {switch.get("name")}, action: {switch.get("action")}')
-            GPIO.add_event_detect(configured_switches[name].pin,
-                                  configured_switches[name].event,
-                                  self._switch_callbacks.get(configured_switches[name].action, self.sw_nc))
+            GPIO.add_event_detect(pin, configured_switches[pin].event, self.sw_interrupt_handler)
         return configured_switches
 
     @staticmethod
@@ -149,71 +134,29 @@ class KegWasher(threading.Thread):
             raise Exception(error_msg)
         return pin_config
 
-    def sw_abort(self, *args, **kwargs):
-        log.debug(f'ABORT Latch Released: received args {args} ;; received kwargs {kwargs}')
-        self._operations.all_off_closed()
-        self._button_lock = False
-        self.update_status('aborted', 1)
-
-    def sw_enter(self, *args, **kwargs):
-        fall_rise = GPIO.input(args[0])
-        log.debug(f'ENTER Button press: received args {args} ;; received kwargs {kwargs} ;; fall_rise {fall_rise}')
-        if self._aborted:
-            log.debug(f'Resetting abort state')
-            self._aborted = False
-            self.update_status('select_mode')
-            return
-        if self._button_lock:
-            log.debug(f'Button lockout enabled, ignoring')
-            return
-        t = threading.Thread(target=self.execute_mode())
+    def sw_interrupt_handler(self, *args):
+        log.debug(f'Switch Interrupt Handler received event for pin {args[0]}')
+        action = self._hardware.get('switches').get(args[0]).get('action')
+        t = Action(**{'action': action,
+                       'hardware': self._hardware,
+                       'modes': self._modes,
+                       'operations': self._operations,
+                       'state': self._state,
+                       'threads': self._threads})
         t.daemon = False
         self._threads.append(t)
         t.start()
 
-    def sw_mode(self, *args, **kwargs):
-        fall_rise = GPIO.input(args[0])
-        log.debug(f'MODE Button press: received args {args} ;; received kwargs {kwargs} ;; fall_rise {fall_rise}')
-        if self._button_lock:
-            log.debug(f'Button lockout enabled, ignoring')
-            return
-        if fall_rise:  # Button Pressed
-            self._mode_button_press_time = time.monotonic()
-        else:  # Button Released
-            cur_time = time.monotonic()
-            orig_time = self._mode_button_press_time
-            self._mode_button_press_time = cur_time
-            delta_time = cur_time - orig_time
-            if delta_time >= 3:
-                log.debug('Previous Mode')
-                self._modes.previous()
-            elif delta_time >= 0.07:
-                log.debug('Next Mode')
-                self._modes.next()
-            else:
-                log.debug('Caught a bounce')
-        self.update_status('select_mode', 1)
-
-    def sw_nc(self, *args, **kwargs):
-        fall_rise = GPIO.input(args[0])
-        log.debug(f'NC Button press: received args {args} ;; received kwargs {kwargs} ;; fall_rise {fall_rise}')
-
-    def update_status(self, status=None, force=0):
-        if status == self._status and not force:
-            log.debug('No status change, not refreshing display')
-            return
-        if status in self._status_map:
-            log.debug(f'Updating status to {status} - force: {force}')
-            self._status = status
-            self._status_map[status]()
-
     def run(self):
         log.debug('Pre-infinite run loop')
-        self.update_status('select_mode')
         log.debug('Entering Infinite Loop Handler')
         try:
-            while self._enabled_loop:
-                time.sleep(1e6)
+            while self._state.get('alive', True):
+                for t in self._threads:
+                    t.join(timeout=0.01)
+                    if not t.is_alive():
+                        self._threads.remove(t)
+                time.sleep(0.1)
         except KeyboardInterrupt:
             self._display.clear()
             GPIO.cleanup()

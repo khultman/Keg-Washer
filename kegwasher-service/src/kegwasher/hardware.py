@@ -143,6 +143,9 @@ class Switch(HardwareObject):
         self._PUD = PUD
         return self.PUD
 
+    def state(self):
+        return GPIO.input(self.pin)
+
     def setup(self):
         log.debug(f'Setting pin {self.pin} to GPIO.IN mode, Pull-UP/DOWN resistor to {self.PUD}')
         GPIO.setup(self.pin, GPIO.IN, pull_up_down=self.PUD)
