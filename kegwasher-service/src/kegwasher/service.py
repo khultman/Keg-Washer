@@ -105,7 +105,7 @@ class KegWasher(threading.Thread):
             configured_switches[pin] = switch_object
             configured_switches[name] = switch_object
             log.debug(f'Configuring event detection for {switch.get("name")}, action: {switch.get("action")}')
-            GPIO.add_event_detect(pin, configured_switches[pin].event, self.sw_interrupt_handler, 500)
+            GPIO.add_event_detect(pin, configured_switches[pin].event, self.sw_interrupt_handler, 100)
         return configured_switches
 
     @staticmethod
@@ -143,12 +143,21 @@ class KegWasher(threading.Thread):
                        'state': self._state,
                        'threads': self._threads})
         t.daemon = False
-        self._threads.append(t)
         t.start()
+        self._threads.append(t)
 
     def run(self):
         log.debug('Entering Infinite Loop Handler')
         try:
+            t = Action(**{'action': 'display_mode_select',
+                          'hardware': self._hardware,
+                          'modes': self._modes,
+                          'operations': self._operations,
+                          'state': self._state,
+                          'threads': self._threads})
+            t.daemon = False
+            t.start()
+            self._threads.append(t)
             while self._state.get('alive', False):
                 if self._state.get('aborted', False):
                     time.sleep(1)
@@ -159,7 +168,7 @@ class KegWasher(threading.Thread):
                                 t.join(timeout=0.01)
                             if not t.is_alive():
                                 self._threads.remove(t)
-                    time.sleep(0.1)
+                    time.sleep(0.01)
         except KeyboardInterrupt:
             log.info('Received Keyboard Interrupt')
             self._display.clear()

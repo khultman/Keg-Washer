@@ -52,15 +52,19 @@ class Action(threading.Thread):
                 t.abort()
                 self._threads.remove(t)
 
+    def display_mode_select(self):
+        log.debug(f'Select Mode: {self._modes.data["display_name"]}')
+        self._hardware.get('display').clear()
+        self._hardware.get('display').message(f'Select Mode\n{self._modes.data["display_name"]}')
+
     def enter(self):
         if self._hardware.get('switches').get('enter').state:
             self._state['enter_button_press_time'] = time.monotonic
             log.debug(f'Enter button pressed at {self._state["enter_button_press_time"]}')
         else:
-            pressed = self._state['enter_button_press_time']
-            released = time.monotonic
+            delta = time.monotonic() - self._state['enter_button_press_time']
             self._state['enter_button_press_time'] = 0
-            log.debug(f'Enter button released at {released}')
+            log.debug(f'Enter button released, held for {round(delta, 3)} seconds')
             if self._state['aborted']:
                 self._state['aborted'] = False
             else:
@@ -83,7 +87,14 @@ class Action(threading.Thread):
             log.debug('Button Press')
             self._state['mode_button_press_time'] = time.monotonic()
         else:
-            log.debug('Button Release')
+            delta = time.monotonic() - self._state['mode_button_press_time']
+            self._state['mode_button_press_time'] = 0
+            log.debug(f'Button Release, held for {round(delta, 3)} seconds')
+            if delta >= 1.5:  # Long Press
+                self._modes.previous()
+            else:
+                self._modes.next()
+            self.display_mode_select()
 
     def run(self):
         log.debug(f'Execution action {self._action}')
@@ -95,36 +106,10 @@ class Action(threading.Thread):
             self.mode()
         elif self._action.lower() == 'enter':
             self.enter()
+        elif self._action.lower() == 'display_mode_select':
+            self.display_mode_select()
         else:
             log.debug('Unknown action, ignoring')
-
-    def sw_mode(self, *args, **kwargs):
-        fall_rise = GPIO.input(args[0])
-        log.debug(f'MODE Button press: received args {args} ;; received kwargs {kwargs} ;; fall_rise {fall_rise}')
-        if self._button_lock:
-            log.debug(f'Button lockout enabled, ignoring')
-            return
-        if fall_rise:  # Button Pressed
-            self._mode_button_press_time = time.monotonic()
-        else:  # Button Released
-            cur_time = time.monotonic()
-            orig_time = self._mode_button_press_time
-            self._mode_button_press_time = cur_time
-            delta_time = cur_time - orig_time
-            if delta_time >= 3:
-                log.debug('Previous Mode')
-                self._modes.previous()
-            elif delta_time >= 0.07:
-                log.debug('Next Mode')
-                self._modes.next()
-            else:
-                log.debug('Caught a bounce')
-        self.update_status('select_mode', 1)
-
-    def select_mode(self):
-        log.debug(f'Select Mode: {self._modes.data["display_name"]}')
-        self._display.clear()
-        self._display.message(f'Select Mode\n{self._modes.data["display_name"]}')
 
     def sw_enter(self, *args, **kwargs):
         fall_rise = GPIO.input(args[0])
