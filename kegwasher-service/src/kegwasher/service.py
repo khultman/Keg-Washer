@@ -8,7 +8,7 @@ import RPi.GPIO as GPIO
 import threading
 import time
 
-from kegwasher.config import *
+from kegwasher.config import pin_config, mode_config
 from kegwasher.exceptions import ConfigError
 from kegwasher.hardware import *
 from kegwasher.linked_list import *
@@ -238,4 +238,9 @@ class KegWasher(threading.Thread):
         except KeyboardInterrupt:
             self._display.clear()
             GPIO.cleanup()
+
+
+if __name__ == '__main__':
+    keg_washer = KegWasher(pin_config, mode_config)
+    keg_washer.start()
 
