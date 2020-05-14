@@ -133,7 +133,7 @@ pin_config = {
         {'name': 'enter',        'pin': 6,    'PUD': GPIO.PUD_DOWN,   'event': GPIO.BOTH,      'action': 'enter'},
         {'name': 'sw_3',         'pin': 12,   'PUD': GPIO.PUD_DOWN,   'event': GPIO.BOTH,      'action': 'nc'},
         {'name': 'sw_4',         'pin': 13,   'PUD': GPIO.PUD_DOWN,   'event': GPIO.BOTH,      'action': 'nc'},
-        {'name': 'abort',        'pin': 20,   'PUD': GPIO.PUD_DOWN,   'event': GPIO.RISING,    'action': 'abort'}
+        {'name': 'abort',        'pin': 20,   'PUD': GPIO.PUD_DOWN,   'event': GPIO.BOTH,      'action': 'abort'}
     ],
     'valves': [
         {'name': 'cleaner_in',   'pin': 21},

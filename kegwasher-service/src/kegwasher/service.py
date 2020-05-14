@@ -151,14 +151,15 @@ class KegWasher(threading.Thread):
         try:
             while self._state.get('alive', False):
                 if self._state.get('aborted', False):
-                    raise AbortException('Aborting')
-                if len(self._threads) >= 1:
-                    for t in self._threads:
-                        if t.is_alive():
-                            t.join(timeout=0.01)
-                        if not t.is_alive():
-                            self._threads.remove(t)
-                time.sleep(0.1)
+                    time.sleep(1)
+                else:
+                    if len(self._threads) >= 1:
+                        for t in self._threads:
+                            if t.is_alive():
+                                t.join(timeout=0.01)
+                            if not t.is_alive():
+                                self._threads.remove(t)
+                    time.sleep(0.1)
         except KeyboardInterrupt:
             log.info('Received Keyboard Interrupt')
             self._display.clear()

@@ -36,14 +36,21 @@ class Action(threading.Thread):
         }
 
     def abort(self):
-        log.debug(f'Aborted\nPress Enter')
-        self._operations.all_off_closed()
-        self._state['aborted'] = True
-        self._hardware.get('display').clear()
-        self._hardware.get('display').message(f'Aborted\nReset Controller')
-        for t in self._threads:
-            t.abort()
-            self._threads.remove(t)
+        if self._state['aborted'] and self._hardware.get('switches').get('abort').state:
+            log.debug(f'Already Aborted, passing')
+            pass
+        elif not self._hardware.get('switches').get('abort').state:
+            log.debug(f'Abort switch reset, resuming operation')
+            self._state['aborted'] = False
+        else:
+            log.debug(f'Aborting')
+            self._operations.all_off_closed()
+            self._state['aborted'] = True
+            self._hardware.get('display').clear()
+            self._hardware.get('display').message(f'Aborted\nReset Controller')
+            for t in self._threads:
+                t.abort()
+                self._threads.remove(t)
 
     def enter(self):
         if self._hardware.get('switches').get('enter').state:
