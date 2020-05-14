@@ -10,7 +10,7 @@ import time
 
 from kegwasher.actions import Action
 from kegwasher.config import pin_config, mode_config
-from kegwasher.exceptions import ConfigError
+from kegwasher.exceptions import AbortException, ConfigError
 from kegwasher.hardware import *
 from kegwasher.linked_list import *
 from kegwasher.operations import Operations
@@ -105,7 +105,7 @@ class KegWasher(threading.Thread):
             configured_switches[pin] = switch_object
             configured_switches[name] = switch_object
             log.debug(f'Configuring event detection for {switch.get("name")}, action: {switch.get("action")}')
-            GPIO.add_event_detect(pin, configured_switches[pin].event, self.sw_interrupt_handler)
+            GPIO.add_event_detect(pin, configured_switches[pin].event, self.sw_interrupt_handler, 500)
         return configured_switches
 
     @staticmethod
@@ -136,8 +136,7 @@ class KegWasher(threading.Thread):
 
     def sw_interrupt_handler(self, *args):
         log.debug(f'Switch Interrupt Handler received event for pin {args[0]}')
-        action = self._hardware.get('switches').get(args[0]).get('action')
-        t = Action(**{'action': action,
+        t = Action(**{'action': self._hardware.get('switches').get(args[0]).action,
                        'hardware': self._hardware,
                        'modes': self._modes,
                        'operations': self._operations,
@@ -148,16 +147,20 @@ class KegWasher(threading.Thread):
         t.start()
 
     def run(self):
-        log.debug('Pre-infinite run loop')
         log.debug('Entering Infinite Loop Handler')
         try:
-            while self._state.get('alive', True):
-                for t in self._threads:
-                    t.join(timeout=0.01)
-                    if not t.is_alive():
-                        self._threads.remove(t)
+            while self._state.get('alive', False):
+                if self._state.get('aborted', False):
+                    raise AbortException('Aborting')
+                if len(self._threads) >= 1:
+                    for t in self._threads:
+                        if t.is_alive():
+                            t.join(timeout=0.01)
+                        if not t.is_alive():
+                            self._threads.remove(t)
                 time.sleep(0.1)
         except KeyboardInterrupt:
+            log.info('Received Keyboard Interrupt')
             self._display.clear()
             GPIO.cleanup()
 
@@ -166,4 +169,5 @@ if __name__ == '__main__':
     keg_washer = KegWasher(pin_config, mode_config)
     keg_washer.daemon = True
     keg_washer.start()
+    keg_washer.join()
 

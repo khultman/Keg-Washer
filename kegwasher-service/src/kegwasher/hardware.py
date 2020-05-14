@@ -143,6 +143,7 @@ class Switch(HardwareObject):
         self._PUD = PUD
         return self.PUD
 
+    @property
     def state(self):
         return GPIO.input(self.pin)
 

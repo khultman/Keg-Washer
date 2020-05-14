@@ -4,14 +4,16 @@
 import logging
 import os
 import threading
+import time
 
-from kegwasher.exceptions import ConfigError
+from kegwasher.exceptions import AbortException
 
 log = logging.getLogger(os.getenv('LOGGER_NAME', 'kegwasher'))
 
 
 class Action(threading.Thread):
     def __init__(self, *args, **kwargs):
+        threading.Thread.__init__(self)
         self._action = kwargs.get('action')
         self._hardware = kwargs.get('hardware', None)
         self._modes = kwargs.get('modes', None)
@@ -35,8 +37,28 @@ class Action(threading.Thread):
 
     def abort(self):
         log.debug(f'Aborted\nPress Enter')
+        self._operations.all_off_closed()
+        self._state['aborted'] = True
         self._hardware.get('display').clear()
-        self._hardware.get('display').message(f'Aborted\nPress Enter')
+        self._hardware.get('display').message(f'Aborted\nReset Controller')
+        for t in self._threads:
+            t.abort()
+            self._threads.remove(t)
+
+    def enter(self):
+        if self._hardware.get('switches').get('enter').state:
+            self._state['enter_button_press_time'] = time.monotonic
+            log.debug(f'Enter button pressed at {self._state["enter_button_press_time"]}')
+        else:
+            pressed = self._state['enter_button_press_time']
+            released = time.monotonic
+            self._state['enter_button_press_time'] = 0
+            log.debug(f'Enter button released at {released}')
+            if self._state['aborted']:
+                self._state['aborted'] = False
+            else:
+                log.debug('Executing Mode')
+                self._state['button_lock'] = True
 
     def execute_mode(self):
         log.debug(f'Executing Mode: {self._modes.data["display_name"]}')
@@ -50,19 +72,21 @@ class Action(threading.Thread):
                 time.sleep(1)
 
     def mode(self):
-        if self._hardware.get('switches').get('sw_mode').state():
-            log.debug('mode switch state high')
+        if self._hardware.get('switches').get('mode').state:
+            log.debug('Button Press')
+            self._state['mode_button_press_time'] = time.monotonic()
         else:
-            log.debug('mode switch state low')
+            log.debug('Button Release')
 
     def run(self):
-        if self._action == 'Abort':
+        log.debug(f'Execution action {self._action}')
+        if self._action.lower() == 'abort':
             self.abort()
         elif self._state.get('button_lock', False):
             log.debug('Control Panel Lockout Enabled, ignoring button press')
-        elif self._action == 'Mode':
+        elif self._action.lower() == 'mode':
             self.mode()
-        elif self._action == 'Enter':
+        elif self._action.lower() == 'enter':
             self.enter()
         else:
             log.debug('Unknown action, ignoring')

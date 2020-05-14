@@ -8,6 +8,10 @@ class KegwasherException(Exception):
     Base Exception Class
     """
 
+class AbortException(KegwasherException):
+    def __init__(self, message):
+        super(AbortException, self).__init__(message)
+
 
 class ConfigError(KegwasherException):
     def __init__(self, message):
