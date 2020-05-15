@@ -16,6 +16,8 @@ not damage or be damaged by the rubber gasket material.
 
 #### Schematics
 
+![Plumbing Schematic](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/KegWasher_1.2_Plumbing_Schematic.svg)
+
 ![Raspberry Pi Hat Schematic](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/KegWasher_1.3_Schematic.svg)
 
 ##### PCB From jlpcb.com
