@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright (C) 2020 Kyle Hultman <khultman@gmail.com>
+
+import ctypes
 import logging
 import os
 import threading
@@ -35,6 +37,20 @@ class Action(threading.Thread):
             'sanitizer_fill':  self._operations.sanitizer_fill
         }
 
+    def get_tid(self):
+        if hasattr(self, '_thread_id'):
+            return self._thread_id
+        for id, thread in threading._active.items():
+            if thread is self:
+                return id
+
+    def abort_thread(self):
+        tid = self.get_tid()
+        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, ctypes.py_object(SystemExit))
+        if res > 1:
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, 0)
+            raise AbortException('Halting Thread')
+
     def abort(self):
         if self._state['aborted'] and self._hardware.get('switches').get('abort').state:
             log.debug(f'Already Aborted, passing')
@@ -42,17 +58,22 @@ class Action(threading.Thread):
         elif not self._hardware.get('switches').get('abort').state:
             log.debug(f'Abort switch reset, resuming operation')
             self._state['aborted'] = False
+            self._state['button_lock'] = False
             self._state['status'] = 'initialize'
         else:
             log.debug(f'Aborting')
             self._operations.all_off_closed()
             self._state['aborted'] = True
             self._state['status'] = 'aborted'
+            for t in self._threads:
+                if t is self:
+                    log.debug('Abort thread itself is not committing suicide')
+                else:
+                    log.debug(f'Shooting thread {t.get_tid()} in the head')
+                    t.abort_thread()
+                    self._threads.remove(t)
             self._hardware.get('display').clear()
             self._hardware.get('display').message(f'Aborted\nReset Controller')
-            for t in self._threads:
-                t.abort()
-                self._threads.remove(t)
 
     def display_mode_select(self):
         log.debug(f'Select Mode: {self._modes.data["display_name"]}')

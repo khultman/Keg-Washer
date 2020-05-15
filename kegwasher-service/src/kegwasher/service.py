@@ -180,9 +180,13 @@ class KegWasher(threading.Thread):
                     time.sleep(0.01)
         except KeyboardInterrupt:
             log.info('Received Keyboard Interrupt')
+            if len(self._threads) >= 1:
+                for t in self._thread:
+                    t.abort_thread()
             self._display.clear()
             self._operations.all_off_closed()
             GPIO.cleanup()
+            raise AbortException('Received Keyboard Interrupt')
 
 
 if __name__ == '__main__':
