@@ -14,7 +14,16 @@ solenoid valves used in prototyping are not rated for food safety by any officia
 made of cast brass, with a rubber gasket made of NBR (Nitrile Rubber) so it can be used with any fluid that will
 not damage or be damaged by the rubber gasket material.
 
+#### Schematics
 
+![Raspberry Pi Hat Schematic](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/KegWasher_1.3_Schematic.svg)
+
+##### PCB From jlpcb.com
+
+![PCB Top Layer](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/jlpcb.com/KegWasher_1.3_top_layers.svg)
+![PCB Bottom Layer](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/jlpcb.com/KegWasher_1.3_bottom_layers.svg)
+
+#### Prototype Build Components
 
 | Component | Qty Used
 | --- | ---: |
