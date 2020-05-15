@@ -88,9 +88,14 @@ class Action(threading.Thread):
             delta = time.monotonic() - self._state['enter_button_press_time']
             self._state['enter_button_press_time'] = 0
             log.debug(f'Enter button released, held for {round(delta, 3)} seconds')
-            log.debug('Executing Mode')
-            self._state['button_lock'] = True
-            self._state['status'] = 'execute_mode'
+            if self._state['status'] == 'execute_complete':
+                pass
+            elif self._state['status'] == 'select_mode':
+                log.debug('Executing Mode')
+                self._state['button_lock'] = True
+                self._state['status'] = 'execute_mode'
+            else:
+                log.warn(f'Controller in unknown status {self._state["status"]} ignoring interrupt')
 
     def execute_mode(self):
         log.debug(f'Executing Mode: {self._modes.data["display_name"]}')
@@ -102,6 +107,10 @@ class Action(threading.Thread):
                 self._hardware.get('display').clear()
                 self._hardware.get('display').message(f'{cmd}\nTime Left: {t - i}')
                 time.sleep(1)
+        self._state['status'] = 'execute_complete'
+        self._state['button_lock'] = False
+        self._hardware.get('display').clear()
+        self._hardware.get('display').message(f'Operations Done\nPress Enter')
 
     def mode(self):
         if self._hardware.get('switches').get('mode').state:
