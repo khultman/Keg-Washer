@@ -4,7 +4,7 @@ from distutils.file_util import copy_file
 from setuptools import setup, find_packages
 
 
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 
 def getRequires():
