@@ -29,7 +29,7 @@ setup(
     long_description_content_type="text/markdown",
     install_requires=getRequires(),
     python_requires='>=3.6',
-    entry_points={"console_scripts": ["kegwasher = kegwasher.service:main"]},
+    entry_points={"console_scripts": ["kegwasher = kegwasher.py:main"]},
     classifiers=[
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',

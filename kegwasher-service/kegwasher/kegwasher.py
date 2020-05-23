@@ -5,8 +5,11 @@
 from kegwasher.config import pin_config, mode_config
 from kegwasher.service import KegWasher
 
-if __name__ == '__main__':
+def main():
     keg_washer = KegWasher(pin_config, mode_config)
     keg_washer.daemon = True
     keg_washer.start()
     keg_washer.join()
+
+if __name__ == '__main__':
+    main()
