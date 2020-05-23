@@ -1,0 +1,14 @@
+[Unit]
+Description=kegwasher
+After=network.target
+
+[Service]
+Environment=LOG_LEVEL=DEBUG
+ExecStart=kegwasher
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target
