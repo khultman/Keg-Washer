@@ -22,7 +22,7 @@ setup(
     author_email='khultman@gmail.com',
     url='https://github.com/khultman/Keg-Washer',
     package_dir={'': 'src'},
-    packages=find_packages(exclude=["kegwasher.py", "temp*.py", "test"]),
+    packages=find_packages(exclude=["temp*.py", "test"]),
     include_package_data=True,
     license='Apache 2.0',
     description='Raspberry PI KegWasher',
