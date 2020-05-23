@@ -21,7 +21,7 @@ setup(
     author='Kyle Hultman',
     author_email='khultman@gmail.com',
     url='https://github.com/khultman/Keg-Washer',
-    packages=find_packages(exclude=["temp*.py", "test"]),
+    packages=find_packages('src', exclude=["kegwasher.py", "temp*.py", "test"]),
     include_package_data=True,
     license='Apache 2.0',
     description='Raspberry PI KegWasher',
@@ -29,7 +29,7 @@ setup(
     long_description_content_type="text/markdown",
     install_requires=getRequires(),
     python_requires='>=3.6',
-    entry_points={"console_scripts": ["kegwasher = kegwasher.service:main"]},
+    entry_points={"console_scripts": ["kegwasher = kegwasher.sh:main"]},
     classifiers=[
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
