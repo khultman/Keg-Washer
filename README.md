@@ -22,8 +22,8 @@ not damage or be damaged by the rubber gasket material.
 
 ##### PCB From jlpcb.com
 
-![PCB Top Layer](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.5/KegWasher_1.5_top_layers.svg)
-![PCB Bottom Layer](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.5/KegWasher_1.5_bottom_layers.svg)
+![PCB Top Layer](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.5/KegWasher_1.5_board_layers_top.svg)
+![PCB Bottom Layer](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.5/KegWasher_1.5_board_layers_bottom.svg)
 
 #### Prototype Build Components
 
