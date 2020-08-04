@@ -16,14 +16,14 @@ not damage or be damaged by the rubber gasket material.
 
 #### Schematics
 
-![Plumbing Schematic](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/KegWasher_1.2_Plumbing_Schematic.svg)
+![Plumbing Schematic](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/Plumbing/KegWasher_1.2_Plumbing_Schematic.svg)
 
-![Raspberry Pi Hat Schematic](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/KegWasher_1.3_Schematic.svg)
+![Raspberry Pi Hat Schematic](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.5/KegWasher_1.5_Schematic.svg)
 
 ##### PCB From jlpcb.com
 
-![PCB Top Layer](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/jlpcb.com/KegWasher_1.3_top_layers.svg)
-![PCB Bottom Layer](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/jlpcb.com/KegWasher_1.3_bottom_layers.svg)
+![PCB Top Layer](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.5/KegWasher_1.5_top_layers.svg)
+![PCB Bottom Layer](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.5/KegWasher_1.5_bottom_layers.svg)
 
 #### Prototype Build Components
 
