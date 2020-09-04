@@ -116,6 +116,8 @@ class Action(threading.Thread):
     def initialize(self):
         log.debug(f'Executing Mode: {self._modes.data["display_name"]}')
         self.abort()
+        if self._state['status'] is not 'aborted':
+            self._state['status'] = 'post_initialize'
 
     def mode(self):
         if self._hardware.get('switches').get('mode').state:

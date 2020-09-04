@@ -164,13 +164,9 @@ class KegWasher(threading.Thread):
                         act = self._state['status']
                         if self._state['status'] == 'execute_mode':
                             self._state['status'] = 'executing'
-                        if self._state['status'] == 'initialize':
-                            act = 'initialize'
-                            self._state['status'] = 'post_initialize'
-                        if self._state['status'] == 'mode_select':
+                        if self._state['status'] == 'post_initialize':
                             act = 'display_mode_select'
                             self._state['status'] = 'select_mode'
-                        # self._state['status'] = 'executing'
                         t = Action(**{'action': act,
                                       'hardware': self._hardware,
                                       'modes': self._modes,
