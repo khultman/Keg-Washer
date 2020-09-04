@@ -9,6 +9,7 @@ from kegwasher.exceptions import ConfigError
 
 log = logging.getLogger(os.getenv('LOGGER_NAME', 'kegwasher'))
 
+
 class Operations(object):
     def __init__(self, *args, **kwargs):
         self._hardware = kwargs.get('hardware', None)

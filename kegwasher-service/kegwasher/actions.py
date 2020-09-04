@@ -52,10 +52,10 @@ class Action(threading.Thread):
             raise AbortException('Halting Thread')
 
     def abort(self):
-        if self._state['aborted'] and self._hardware.get('switches').get('abort').state:
+        if self._state['aborted'] and not self._hardware.get('switches').get('abort').state:
             log.debug(f'Already Aborted, passing')
             pass
-        elif not self._hardware.get('switches').get('abort').state:
+        elif self._hardware.get('switches').get('abort').state:
             log.debug(f'Abort switch reset, resuming operation')
             self._state['aborted'] = False
             self._state['button_lock'] = False
@@ -64,6 +64,7 @@ class Action(threading.Thread):
             log.debug(f'Aborting')
             self._operations.all_off_closed()
             self._state['aborted'] = True
+            self._state['button_lock'] = True
             self._state['status'] = 'aborted'
             for t in self._threads:
                 if t is self:
@@ -73,7 +74,7 @@ class Action(threading.Thread):
                     t.abort_thread()
                     self._threads.remove(t)
             self._hardware.get('display').clear()
-            self._hardware.get('display').message(f'Aborted\nReset Controller')
+            self._hardware.get('display').message(f'Aborted  ======>\nReset Abort SW')
 
     def display_mode_select(self):
         log.debug(f'Select Mode: {self._modes.data["display_name"]}')
@@ -112,6 +113,10 @@ class Action(threading.Thread):
         self._hardware.get('display').clear()
         self._hardware.get('display').message(f'Operations Done\nPress Enter')
 
+    def initialize(self):
+        log.debug(f'Executing Mode: {self._modes.data["display_name"]}')
+        self.abort()
+
     def mode(self):
         if self._hardware.get('switches').get('mode').state:
             log.debug('Button Press')
@@ -127,7 +132,7 @@ class Action(threading.Thread):
             self.display_mode_select()
 
     def run(self):
-        log.debug(f'Execution action {self._action}')
+        log.debug(f'Execution action: {self._action}')
         if self._action.lower() == 'abort':
             self.abort()
         elif self._action.lower() == 'execute_mode':
@@ -140,6 +145,8 @@ class Action(threading.Thread):
             self.enter()
         elif self._action.lower() == 'display_mode_select':
             self.display_mode_select()
+        elif self._action.lower() == 'initialize':
+            self.initialize()
         else:
             log.debug('Unknown action, ignoring')
 
