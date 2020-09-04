@@ -37,6 +37,17 @@ class Action(threading.Thread):
             'sanitizer_fill':  self._operations.sanitizer_fill
         }
 
+    def _remove_abort_state(self):
+        self._state['aborted'] = False
+        self._state['button_lock'] = False
+        self._state['status'] = 'initialize'
+
+    def _set_abort_state(self):
+        self._operations.all_off_closed()
+        self._state['aborted'] = True
+        self._state['button_lock'] = True
+        self._state['status'] = 'aborted'
+
     def get_tid(self):
         if hasattr(self, '_thread_id'):
             return self._thread_id
@@ -57,15 +68,10 @@ class Action(threading.Thread):
             pass
         elif self._hardware.get('switches').get('abort').state:
             log.debug(f'Abort switch reset, resuming operation')
-            self._state['aborted'] = False
-            self._state['button_lock'] = False
-            self._state['status'] = 'initialize'
+            self._remove_abort_state()
         else:
             log.debug(f'Aborting')
-            self._operations.all_off_closed()
-            self._state['aborted'] = True
-            self._state['button_lock'] = True
-            self._state['status'] = 'aborted'
+            self._set_abort_state()
             for t in self._threads:
                 if t is self:
                     log.debug('Abort thread itself is not committing suicide')
@@ -115,7 +121,10 @@ class Action(threading.Thread):
 
     def initialize(self):
         log.debug(f'Executing Mode: {self._modes.data["display_name"]}')
-        self.abort()
+        if not self._hardware.get('switches').get('abort').state:
+            self._set_abort_state()
+            self._hardware.get('display').clear()
+            self._hardware.get('display').message(f'Reset Abort SW\nto activate ===>')
         if self._state['status'] is not 'aborted':
             self._state['status'] = 'post_initialize'
 

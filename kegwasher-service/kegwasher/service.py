@@ -25,12 +25,7 @@ class KegWasher(threading.Thread):
     def __init__(self, pin_config=None, mode_config=None):
         log.debug(f'Initializing KegWasher')
         threading.Thread.__init__(self)
-        # self._status_map = {
-        #     'initialize': self.__init__,
-        #     'select_mode': self.select_mode,
-        #     'aborted': self.aborted_mode,
-        # }
-        #
+        # self._state tracks global state among all threads
         self._state = {
             'aborted': False,
             'alive': True,
@@ -39,9 +34,11 @@ class KegWasher(threading.Thread):
             'mode_button_press_time': 0,
             'status': 'initialize'
         }
+        # self._threads keeps tracks of all spawned threads
         self._threads = list()
-        #
+        # Make sure we have a good configuration
         self._pin_config = self._validate_hardware_config(pin_config)
+        # self._hardware is the collection of our hardware interfaces
         self._hardware = dict()
         self._hardware['display'] = Display().init_display(pin_config.get('display'))
         self._hardware.get('display').clear()
@@ -50,9 +47,10 @@ class KegWasher(threading.Thread):
         self._hardware['pumps'] = self._init_pumps(pin_config.get('pumps'))
         self._hardware['valves'] = self._init_valves(pin_config.get('valves'))
         self._hardware['switches'] = self._init_switches(pin_config.get('switches'))
+        # self._operations is the map of what the hardware can do
         self._operations = Operations(hardware=self._hardware)
         self._operations.all_off_closed()
-        #
+        # self._modes is the map of what the user can do
         self._modes = self._init_modes(mode_config)
 
     @staticmethod
