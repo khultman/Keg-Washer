@@ -43,8 +43,8 @@ class KegWasher(threading.Thread):
         self._hardware['display'] = Display().init_display(pin_config.get('display'))
         self._hardware.get('display').clear()
         self._hardware.get('display').message(f'Initializing....\nPlease.Standby..')
-        if pin_config.get('expanders'):
-            self._hardware['expanders'] = self._init_expanders(pin_config.get('expanders'))
+        if pin_config.get('io_expanders', None):
+            self._hardware['expanders'] = self._init_expanders(pin_config.get('io_expanders'))
         else:
             self._hardware['expanders'] = dict()
         self._hardware['heaters'] = self._init_heaters(pin_config.get('heaters'), self._hardware['expanders'])
