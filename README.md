@@ -18,12 +18,20 @@ not damage or be damaged by the rubber gasket material.
 
 ![Plumbing Schematic](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/Plumbing/KegWasher_1.2_Plumbing_Schematic.svg)
 
-![Raspberry Pi Hat Schematic](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.5/KegWasher_1.5_Schematic.svg)
+![Raspberry Pi Hat Schematic](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.8/Logic%20%26%20I%3AO/KegWasher_1.8_LogicIO_Schematic.svg)
+![High Current Relay Daughter Board](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.8/Relay/KegWasher_1.8_HCRelay_Schematic.svg)
 
 ##### PCB From jlpcb.com
 
-![PCB Top Layer](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.5/KegWasher_1.5_board_layers_top.svg)
-![PCB Bottom Layer](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.5/KegWasher_1.5_board_layers_bottom.svg)
+###### Raspberry Pi Hat
+![PCB All Layers](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.8/Logic%20%26%20I%3AO/KegWasher_1.8_LogicIO_board_layers_all.svg)
+![PCB Top Layer](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.8/Logic%20%26%20I%3AO/KegWasher_1.8_LogicIO_board_layers_top.svg)
+![PCB Bottom Layer](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.8/Logic%20%26%20I%3AO/KegWasher_1.8_LogicIO_board_layers_bottom.svg)
+
+###### High Current Daughter Board
+![PCB All Layers](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.8/Relay/KegWasher_1.8_HCRelay_board_layers_all.svg)
+![PCB Top Layer](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.8/Relay/KegWasher_1.8_HCRelay_board_layers_top.svg)
+![PCB Bottom Layer](https://raw.githubusercontent.com/khultman/Keg-Washer/master/schematics/RaspberryPi-Hat/v1.8/Relay/KegWasher_1.8_HCRelay_board_layers_bottom.svg)
 
 #### Prototype Build Components
 
