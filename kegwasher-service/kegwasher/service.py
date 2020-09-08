@@ -81,7 +81,7 @@ class KegWasher(threading.Thread):
                 raise ConfigError(error_msg)
             if heater.get('expander', None):
                 if expanders.get(heater.get('expander'), None):
-                    heater['expander'] = expanders.get(heater.get('expander'))
+                    heater['expander'] = expanders[heater['expander']]
                 else:
                     error_msg = f'Device has non-existent IO Expander configured {heater}'
                     log.fatal(error_msg)
@@ -108,7 +108,7 @@ class KegWasher(threading.Thread):
                 raise ConfigError(error_msg)
             if pump.get('expander', None):
                 if expanders.get(pump.get('expander)'), None):
-                    pump['expander'] = expanders.get(pump.get('expander'))
+                    pump['expander'] = expanders[pump['expander']]
                 else:
                     error_msg = f'Device has non-existent IO Expander configured {pump}'
                     log.fatal(error_msg)
@@ -148,7 +148,7 @@ class KegWasher(threading.Thread):
                 raise Exception(error_msg)
             if valve.get('expander', None):
                 if expanders.get(valve.get('expander'), None):
-                    valve['expander'] = expanders.get(valve.get('expander'))
+                    valve['expander'] = expanders[valve['expander']]
                 else:
                     error_msg = f'Device has non-existent IO Expander configured {valve}'
                     log.fatal(error_msg)
