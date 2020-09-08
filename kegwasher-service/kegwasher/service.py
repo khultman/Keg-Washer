@@ -47,10 +47,10 @@ class KegWasher(threading.Thread):
             self._hardware['expanders'] = self._init_expanders(pin_config.get('io_expanders'))
         else:
             self._hardware['expanders'] = dict()
-        self._hardware['heaters'] = self._init_heaters(pin_config.get('heaters'), self._hardware['expanders'])
-        self._hardware['pumps'] = self._init_pumps(pin_config.get('pumps'), self._hardware['expanders'])
-        self._hardware['valves'] = self._init_valves(pin_config.get('valves'), self._hardware['expanders'])
-        self._hardware['switches'] = self._init_switches(pin_config.get('switches'), self._hardware['expanders'])
+        self._hardware['heaters'] = self._init_heaters(pin_config.get('heaters'), self._hardware.get('expanders'))
+        self._hardware['pumps'] = self._init_pumps(pin_config.get('pumps'), self._hardware.get('expanders'))
+        self._hardware['valves'] = self._init_valves(pin_config.get('valves'), self._hardware.get('expanders'))
+        self._hardware['switches'] = self._init_switches(pin_config.get('switches'), self._hardware.get('expanders'))
         # self._operations is the map of what the hardware can do
         self._operations = Operations(hardware=self._hardware)
         self._operations.all_off_closed()
