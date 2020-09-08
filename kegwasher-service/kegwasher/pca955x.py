@@ -131,14 +131,14 @@ class pca955x(object):
         return self.direction
 
     def input(self, pin):
-        if not self.direction & (1 << pin) == 0:
+        if not self.direction & (1 << pin) == 1:
             error_msg = f'Pin {pin} is not set to input'
             log.critical(error_msg)
             raise IOError(error_msg)
         return self._readpin(self._ports['INPUT_PORT'], pin) & (1 << pin)
 
     def output(self, pin, value):
-        if self.direction & (1 << pin) == 0:
+        if self.direction & (1 << pin) == 1:
             error_msg = f'Pin {pin} is not set to output'
             log.critical(error_msg)
             raise IOError(error_msg)
