@@ -6,6 +6,7 @@ import Adafruit_CharLCD as LCD
 import logging
 import RPi.GPIO as GPIO
 import os
+from kegwasher.pca955x import pca955x
 
 from kegwasher.exceptions import ConfigError
 
@@ -25,6 +26,19 @@ class Display(object):
             display.get('lcd_rows'),
             display.get('lcd_bl').get('pin'))
         return lcd
+
+
+class Expander(object):
+    def __init__(self, *args, **kwargs):
+        log.debug(f'Making expander object\t\targs: {args}\t\tkwargs: {kwargs}')
+        self._gpio = None
+        self._drivers = {'pca955x': pca955x}
+        if kwargs.get('driver', None) in self._drivers:
+            self._gpio = self._drivers.get(kwargs.get('driver'))(**kwargs)
+
+    @property
+    def GPIO(self):
+        return self._gpio
 
 
 class HardwareObject(object):
@@ -80,14 +94,14 @@ class HardwareObject(object):
     def off(self):
         log.debug(f'Setting pin {self.pin} to OFF/Low Voltage')
         if self.expander:
-            pass
+            self.expander.GPIO.output(self.pin, 0)
         else:
             GPIO.output(self.pin, 0)
 
     def on(self):
         log.debug(f'Setting pin {self.pin} to ON/High Voltage')
         if self.expander:
-            pass
+            self.expander.GPIO.output(self.pin, 1)
         else:
             GPIO.output(self.pin, 1)
 
@@ -97,7 +111,10 @@ class HardwareObject(object):
 
     def setup(self):
         log.debug(f'Setting pin {self.pin} to GPIO.OUT mode')
-        GPIO.setup(self.pin, GPIO.OUT)
+        if self.expander:
+            self.expander.GPIO.setup(self.pin, GPIO.OUT)
+        else:
+            GPIO.setup(self.pin, GPIO.OUT)
 
 
 class Heater(HardwareObject):

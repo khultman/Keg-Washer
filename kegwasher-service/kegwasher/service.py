@@ -54,7 +54,20 @@ class KegWasher(threading.Thread):
         self._modes = self._init_modes(mode_config)
 
     @staticmethod
-    def _init_heaters(heaters=list()):
+    def _init_expanders(expanders=list()):
+        log.debug(f'Initializing IO Expanders')
+        configured_expanders = dict()
+        for expander in expanders:
+            for check in ['name', 'address', 'gpios', 'bus']:
+                if not expander.get(check, None):
+                    error_msg = f'Missing correct expander configuration {expander}'
+                    log.fatal(error_msg)
+                    raise ConfigError(error_msg)
+            configured_expanders[expander.get('name')] = Expander(**expander)
+        return configured_expanders
+
+    @staticmethod
+    def _init_heaters(heaters=list(), expanders=dict()):
         log.debug(f'Initializing heaters')
         configured_heaters = dict()
         for heater in heaters:
@@ -62,6 +75,13 @@ class KegWasher(threading.Thread):
                 error_msg = f'Missing correct heater configuration {heater}'
                 log.fatal(error_msg)
                 raise ConfigError(error_msg)
+            if heater.get('expander', None):
+                if expanders.get(heater.get('expander'), None):
+                    heater['expander'] = expanders.get(heater.get('expander'))
+                else:
+                    error_msg = f'Device has non-existent IO Expander configured {heater}'
+                    log.fatal(error_msg)
+                    raise ConfigError(error_msg)
             configured_heaters[heater.get('name')] = Heater(**heater)
         return configured_heaters
 
@@ -74,7 +94,7 @@ class KegWasher(threading.Thread):
         return cdll
 
     @staticmethod
-    def _init_pumps(pumps=list()):
+    def _init_pumps(pumps=list(), expanders=dict()):
         log.debug(f'Initializing pumps')
         configured_pumps = dict()
         for pump in pumps:
@@ -82,6 +102,13 @@ class KegWasher(threading.Thread):
                 error_msg = f'Missing correct pump configuration {pump}'
                 log.fatal(error_msg)
                 raise ConfigError(error_msg)
+            if pump.get('expander', None):
+                if expanders.get(pump.get('expander)'), None):
+                    pump['expander'] = expanders.get(pump.get('expander'))
+                else:
+                    error_msg = f'Device has non-existent IO Expander configured {pump}'
+                    log.fatal(error_msg)
+                    raise ConfigError(error_msg)
             configured_pumps[pump.get('name')] = Pump(**pump)
         return configured_pumps
 
@@ -107,7 +134,7 @@ class KegWasher(threading.Thread):
         return configured_switches
 
     @staticmethod
-    def _init_valves(valves=list()):
+    def _init_valves(valves=list(), expanders=dict()):
         log.debug(f'Initializing valves')
         configured_valves = dict()
         for valve in valves:
@@ -115,6 +142,13 @@ class KegWasher(threading.Thread):
                 error_msg = f'Missing valve configuration: {valve}'
                 log.fatal(error_msg)
                 raise Exception(error_msg)
+            if valve.get('expander', None):
+                if expanders.get(valve.get('expander'), None):
+                    valve['expander'] = expanders.get(valve.get('expander'))
+                else:
+                    error_msg = f'Device has non-existent IO Expander configured {valve}'
+                    log.fatal(error_msg)
+                    raise ConfigError(error_msg)
             configured_valves[valve.get('name')] = Valve(**valve)
         return configured_valves
 

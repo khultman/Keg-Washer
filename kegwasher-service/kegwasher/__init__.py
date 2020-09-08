@@ -10,6 +10,7 @@ from kegwasher.config import *
 from kegwasher.hardware import *
 from kegwasher.linked_list import *
 from kegwasher.operations import *
+from kegwasher.pca955x import *
 from kegwasher.service import *
 
 
