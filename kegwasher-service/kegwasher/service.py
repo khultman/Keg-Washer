@@ -43,10 +43,14 @@ class KegWasher(threading.Thread):
         self._hardware['display'] = Display().init_display(pin_config.get('display'))
         self._hardware.get('display').clear()
         self._hardware.get('display').message(f'Initializing....\nPlease.Standby..')
-        self._hardware['heaters'] = self._init_heaters(pin_config.get('heaters'))
-        self._hardware['pumps'] = self._init_pumps(pin_config.get('pumps'))
-        self._hardware['valves'] = self._init_valves(pin_config.get('valves'))
-        self._hardware['switches'] = self._init_switches(pin_config.get('switches'))
+        if pin_config.get('expanders'):
+            self._hardware['expanders'] = self._init_expanders(pin_config.get('expanders'))
+        else:
+            self._hardware['expanders'] = dict()
+        self._hardware['heaters'] = self._init_heaters(pin_config.get('heaters'), self._hardware['expanders'])
+        self._hardware['pumps'] = self._init_pumps(pin_config.get('pumps'), self._hardware['expanders'])
+        self._hardware['valves'] = self._init_valves(pin_config.get('valves'), self._hardware['expanders'])
+        self._hardware['switches'] = self._init_switches(pin_config.get('switches'), self._hardware['expanders'])
         # self._operations is the map of what the hardware can do
         self._operations = Operations(hardware=self._hardware)
         self._operations.all_off_closed()
@@ -112,7 +116,7 @@ class KegWasher(threading.Thread):
             configured_pumps[pump.get('name')] = Pump(**pump)
         return configured_pumps
 
-    def _init_switches(self, switches=list()):
+    def _init_switches(self, switches=list(), expanders=dict()):
         log.debug(f'Initializing switches')
         configured_switches = dict()
         for switch in switches:
