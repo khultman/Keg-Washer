@@ -3,6 +3,7 @@
 # Copyright (C) 2020 Kyle Hultman <khultman@gmail.com>
 
 import logging
+import os
 import smbus2
 
 from kegwasher.exceptions import ConfigError
