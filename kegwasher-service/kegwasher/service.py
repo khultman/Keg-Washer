@@ -107,7 +107,7 @@ class KegWasher(threading.Thread):
                 log.fatal(error_msg)
                 raise ConfigError(error_msg)
             if pump.get('expander', None):
-                if expanders.get(pump.get('expander)'), None):
+                if expanders.get(pump.get('expander'), None):
                     pump['expander'] = expanders[pump['expander']]
                 else:
                     error_msg = f'Device has non-existent IO Expander configured {pump}'
