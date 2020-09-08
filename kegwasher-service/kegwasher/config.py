@@ -123,10 +123,13 @@ pin_config = {
         'lcd_rows':     2
     },
     'heaters': [
-        {'name': 'heater_1',     'pin': 11}
+        {'name': 'heater_1',     'expander': 'expander0', 'pin': 8}
+    ],
+    'io_expanders': [
+        {'name': 'expander0',    'bus': 1, 'driver': 'pca955x', 'address': 0x20, 'gpios': 16}
     ],
     'pumps': [
-        {'name': 'pump_1',       'pin': 27}
+        {'name': 'pump_1',       'expander': 'expander0', 'pin': 4}
     ],
     'switches': [
         {'name': 'mode',         'pin': 5,    'PUD': GPIO.PUD_DOWN,   'event': GPIO.BOTH,      'action': 'mode'},
@@ -136,15 +139,15 @@ pin_config = {
         {'name': 'abort',        'pin': 20,   'PUD': GPIO.PUD_DOWN,   'event': GPIO.BOTH,      'action': 'abort'}
     ],
     'valves': [
-        {'name': 'cleaner_in',   'pin': 21},
-        {'name': 'sanitizer_in', 'pin': 26},
-        {'name': 'water_in',     'pin': 4},
-        {'name': 'pump_in',      'pin': 17},
-        {'name': 'co2_in',       'pin': 18},
-        {'name': 'air_in',       'pin': 22},
-        {'name': 'cleaner_rtn',  'pin': 23},
-        {'name': 'pump_out',     'pin': 24},
-        {'name': 'waste_out',    'pin': 25}
+        {'name': 'cleaner_in',   'expander': 'expander0', 'pin': 1},
+        {'name': 'sanitizer_in', 'expander': 'expander0', 'pin': 2},
+        {'name': 'water_in',     'expander': 'expander0', 'pin': 3},
+        {'name': 'pump_in',      'expander': 'expander0', 'pin': 5},
+        {'name': 'co2_in',       'expander': 'expander0', 'pin': 6},
+        {'name': 'air_in',       'expander': 'expander0', 'pin': 7},
+        {'name': 'cleaner_rtn',  'expander': 'expander0', 'pin': 9},
+        {'name': 'pump_out',     'expander': 'expander0', 'pin': 10},
+        {'name': 'waste_out',    'expander': 'expander0', 'pin': 11}
     ]
 }
 

@@ -30,11 +30,22 @@ class Display(object):
 class HardwareObject(object):
     def __init__(self, *args, **kwargs):
         log.debug(f'Making hardware object\t\targs: {args}\t\tkwargs: {kwargs}')
+        self._expander = None
         self._name = None
         self._pin = None
+        self.expander = kwargs.get('expander', None)
         self.name = kwargs.get('name', None)
         self.pin = kwargs.get('pin', None)
         self.setup()
+
+    @property
+    def expander(self):
+        return self._expander
+
+    @expander.setter
+    def expander(self, expander=None):
+        self._expander = expander
+        return self.expander
 
     @property
     def name(self):
@@ -62,17 +73,25 @@ class HardwareObject(object):
         self._pin = pin
         return self.pin
 
+    # Alias to off
     def close(self):
         self.off()
 
     def off(self):
         log.debug(f'Setting pin {self.pin} to OFF/Low Voltage')
-        GPIO.output(self.pin, 0)
+        if self.expander:
+            pass
+        else:
+            GPIO.output(self.pin, 0)
 
     def on(self):
         log.debug(f'Setting pin {self.pin} to ON/High Voltage')
-        GPIO.output(self.pin, 1)
+        if self.expander:
+            pass
+        else:
+            GPIO.output(self.pin, 1)
 
+    # Alias to on
     def open(self):
         self.on()
 
