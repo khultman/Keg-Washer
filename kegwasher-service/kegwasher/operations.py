@@ -88,7 +88,7 @@ class Operations(object):
         self.all_off_closed()
         self.valves_open('cleaner_in', 'waste_out', 'pump_in', 'pump_out')
         self.pumps_on('pump_1')
-        self.heaters_on('header_1')
+        self.heaters_on('heater_1')
 
     def cleaner_fill(self):
         log.debug('Operation state cleaner_fill')
