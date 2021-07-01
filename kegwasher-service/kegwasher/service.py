@@ -198,7 +198,9 @@ class KegWasher(threading.Thread):
                                 self._threads.remove(t)
                     if self._state['status'] in ['execute_mode', 'initialize', 'post_initialize']:
                         act = self._state['status']
+                        log.debug(f'Current status: {act}')
                         if self._state['status'] == 'execute_mode':
+                            log.debug('setting status to: executing')
                             self._state['status'] = 'executing'
                         if self._state['status'] == 'post_initialize':
                             act = 'display_mode_select'

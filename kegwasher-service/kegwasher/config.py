@@ -97,7 +97,7 @@ mode_config = {
         'display_name': 'Fill Sanitizer',
         'operations': [
             #  Operation         Time to Run Operation
-            ('santizer_fill',    10)
+            ('sanitizer_fill',   10)
         ]
     },
     'cleaner_fill': {
@@ -105,6 +105,21 @@ mode_config = {
         'operations': [
             #  Operation         Time to Run Operation
             ('cleaner_fill',     10)
+        ]
+    },
+    'self_test': {
+        'display_name': 'Self Test',
+        'operations': [
+            ('air_fill_closed',  5),
+            ('air_fill_open',    5),
+            ('clean_closed',     5),
+            ('clean_open',       5),
+            ('co2_fill_closed',  5),
+            ('co2_fill_open',    5),
+            ('drain',            5),
+            ('rinse',            5),
+            ('sanitize',         5),
+            ('sanitizer_fill',   5)
         ]
     }
 }
