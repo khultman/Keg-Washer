@@ -26,6 +26,7 @@ class Action(threading.Thread):
         self._mode_operation_map = {
             'air_fill_closed': self._operations.air_fill_closed,
             'air_fill_open':   self._operations.air_fill_open,
+            'all_off_closed':  self._operations.all_off_closed,
             'clean_closed':    self._operations.clean_closed,
             'clean_open':      self._operations.clean_open,
             'cleaner_fill':    self._operations.cleaner_fill,
@@ -114,6 +115,7 @@ class Action(threading.Thread):
                 self._hardware.get('display').clear()
                 self._hardware.get('display').message(f'{cmd}\nTime Left: {t - i}')
                 time.sleep(1)
+        self._mode_operation_map.get('all_off_closed')()
         self._state['status'] = 'execute_complete'
         self._state['button_lock'] = False
         self._hardware.get('display').clear()
